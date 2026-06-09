@@ -1,0 +1,32 @@
+/* Scrollbar width */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+/* Track (background) */
+::-webkit-scrollbar-track {
+  background: #f3f4f6; /* light gray */
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #111827;
+}
+
+/* Thumb (the draggable part) */
+::-webkit-scrollbar-thumb {
+  background: #dee1e7; /* gray-300 */
+  border-radius: 9999px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #374151;
+}
+
+/* Hover effect */
+::-webkit-scrollbar-thumb:hover {
+  background: #caced5; /* gray-400 */
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
+}
