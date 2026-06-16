@@ -1,0 +1,17 @@
+{
+  "name": "SalesForge",
+  "short_name": "SalesForge",
+  "description": "B2B SaaS sales platform with lead intelligence",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#00b5ad",
+  "icons": [
+    {
+      "src": "/UptoSkillsLogo.webp",
+      "sizes": "any",
+      "type": "image/webp",
+      "purpose": "any maskable"
+    }
+  ]
+}
