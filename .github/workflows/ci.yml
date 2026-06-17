@@ -1,0 +1,116 @@
+name: Full Stack CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend (schema, install, smoke test)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres1234
+          POSTGRES_DB: salesforge_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          set -e
+          rm -rf node_modules package-lock.json
+          npm install --no-audit --no-fund --legacy-peer-deps
+      - name: Validate Prisma schema
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres1234@localhost:5432/salesforge_test
+        run: npx prisma validate
+      - name: Push schema
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres1234@localhost:5432/salesforge_test
+        run: npx prisma db push --skip-generate --accept-data-loss
+      - name: Seed database
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres1234@localhost:5432/salesforge_test
+        run: node prisma/seed.js
+      - name: Boot server
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres1234@localhost:5432/salesforge_test
+          PORT: 3001
+          NODE_ENV: test
+          JWT_SECRET: test-secret-for-ci
+        run: |
+          nohup node server.js > /tmp/sf-backend.log 2>&1 &
+          echo $! > /tmp/sf-backend.pid
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3001/api/health >/dev/null 2>&1; then
+              echo "Backend ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+      - name: Smoke-test endpoints
+        env:
+          API: http://localhost:3001
+        run: |
+          bash -c '
+          set -e
+          curl -fsS $API/api/health | grep -q "ok"
+          LOGIN=$(curl -fsS -X POST $API/api/auth/login -H "Content-Type: application/json" -d "{\"email\":\"demo@salesforge.com\",\"password\":\"Demo1234!\"}")
+          TOKEN=$(echo "$LOGIN" | node -e "let d=\"\";process.stdin.on(\"data\",c=>d+=c).on(\"end\",()=>{const j=JSON.parse(d);console.log(j.data?.token || j.token || \"\")})")
+          for ep in /api/leads /api/deals /api/organizations /api/activities /api/users /api/tags /api/notifications /api/contacts /api/territories /api/quotas /api/commissions /api/calls /api/documents /api/contracts /api/surveys /api/tickets /api/campaigns /api/kb /api/health-scores /api/ai-scoring/insights /api/search /api/products /api/quotes /api/playbooks /api/win-loss /api/reports /api/forecasts /api/sequences /api/workflows /api/templates /api/custom-fields /api/analytics/global; do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $TOKEN" $API$ep)
+            echo "  $ep -> $CODE"
+            [ "$CODE" = "200" ] || (echo "FAILED $ep=$CODE" && exit 1)
+          done
+          echo "All endpoints OK"
+          '
+
+  frontend:
+    name: Frontend (install, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend
+        run: |
+          set -e
+          rm -rf node_modules package-lock.json
+          npm install --no-audit --no-fund --legacy-peer-deps
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          if-no-files-found: ignore
+          retention-days: 3
