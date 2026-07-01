@@ -1,9 +1,12 @@
 import { useState, useRef, useEffect } from "react";
-import { X, Send, MessageCircle, Bot } from "lucide-react";
+import { X, Send } from "lucide-react";
 import { useLocation } from "react-router-dom";
+import { useTheme } from "../context/ThemeContext";
 
 export default function ChatBot() {
     const location = useLocation();
+    const { theme } = useTheme();
+    const darkMode = theme === "dark";
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState("");
@@ -101,7 +104,7 @@ export default function ChatBot() {
         <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end font-sans">
             {/* Chat Window */}
             {isOpen && (
-                <div className="mb-4 w-80 md:w-96 h-[500px] bg-white rounded-xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-5 fade-in duration-300 flex flex-col border border-gray-100">
+                <div className={`mb-4 w-80 md:w-96 h-[500px] rounded-xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-5 fade-in duration-300 flex flex-col border transition-colors duration-300 ${darkMode ? "border-gray-700 bg-slate-900" : "border-gray-100 bg-white"}`}>
 
                     {/* Header */}
                     <div className="bg-[#2DD4BF] h-32 relative flex justify-center items-center">
@@ -130,7 +133,7 @@ export default function ChatBot() {
                     </div>
 
                     {/* Messages Area */}
-                    <div className="flex-1 overflow-y-auto p-4 bg-white flex flex-col gap-4">
+                    <div className={`flex-1 overflow-y-auto p-4 flex flex-col gap-4 transition-colors duration-300 ${darkMode ? "bg-slate-900" : "bg-white"}`}>
                         {messages.map((msg, idx) => (
                             <div
                                 key={idx}
@@ -146,9 +149,9 @@ export default function ChatBot() {
 
                                 {/* Message Bubble */}
                                 <div
-                                    className={`p-3 text-sm leading-relaxed ${msg.sender === "user"
-                                        ? "bg-[#2DD4BF] text-white rounded-2xl rounded-br-sm shadow-md"
-                                        : "text-gray-800 font-medium"
+                                    className={`p-3 text-sm leading-relaxed rounded-2xl ${msg.sender === "user"
+                                        ? "bg-[#2DD4BF] text-white rounded-br-sm shadow-md"
+                                        : `${darkMode ? "bg-slate-800 text-slate-100" : "bg-gray-100 text-gray-800"} font-medium`
                                         }`}
                                 >
                                     {msg.text}
@@ -161,7 +164,7 @@ export default function ChatBot() {
                                 <div className="w-8 h-8 shrink-0">
                                     <img src="/robot.png" alt="Bot" className="w-full h-full object-contain opacity-50" />
                                 </div>
-                                <div className="bg-gray-100 text-gray-500 text-xs px-3 py-2 rounded-full animate-pulse">
+                                <div className={`text-xs px-3 py-2 rounded-full animate-pulse ${darkMode ? "bg-slate-800 text-slate-300" : "bg-gray-100 text-gray-500"}`}>
                                     Typing...
                                 </div>
                             </div>
@@ -170,12 +173,12 @@ export default function ChatBot() {
                     </div>
 
                     {/* Input Area */}
-                    <div className="p-4 bg-white">
+                    <div className={`p-4 transition-colors duration-300 ${darkMode ? "bg-slate-900" : "bg-white"}`}>
                         <div className="relative flex items-center">
                             <input
                                 type="text"
                                 placeholder="Type here......."
-                                className="w-full pl-4 pr-12 py-3 bg-white border border-gray-300 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-[#2DD4BF] focus:border-transparent placeholder-gray-400 shadow-sm"
+                                className={`w-full pl-4 pr-12 py-3 border rounded-full text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#2DD4BF] focus:border-transparent transition-colors duration-300 ${darkMode ? "bg-slate-800 border-slate-700 text-white placeholder-gray-400" : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"}`}
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 onKeyDown={(e) => e.key === "Enter" && handleSend()}
@@ -183,7 +186,7 @@ export default function ChatBot() {
                             <button
                                 onClick={handleSend}
                                 disabled={loading}
-                                className="absolute right-2 p-2 text-black hover:text-[#2DD4BF] transition-colors disabled:opacity-50"
+                                className={`absolute right-2 p-2 transition-colors disabled:opacity-50 ${darkMode ? "text-slate-200 hover:text-[#2DD4BF]" : "text-black hover:text-[#2DD4BF]"}`}
                             >
                                 <Send className="w-5 h-5 fill-current" />
                             </button>
