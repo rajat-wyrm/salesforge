@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router";
+import { useNavigate } from "react-router";
+import { useAuth } from "../../../context/AuthContext";
 import { FaSun, FaMoon, FaUser, FaLock, FaGlobe, FaShieldAlt } from "react-icons/fa";
 import { useTheme } from "../../../context/ThemeContext";
 
@@ -48,6 +49,13 @@ const SectionHeading = ({ icon, label, dark }) => (
 const Settings1 = () => {
   const { theme, toggleTheme } = useTheme();
   const dark = theme === "dark";
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login", { replace: true });
+  };
 
   const [name,          setName]          = useState("");
   const [email,         setEmail]         = useState("");
@@ -219,23 +227,23 @@ const Settings1 = () => {
         </button>
 
         {/* ── Logout ───────────────────────────────────────────────────── */}
-        <Link to="/">
-          <button
-            onMouseEnter={(e) => { e.currentTarget.style.background = "#be123c"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = dark ? "rgba(239,68,68,0.14)" : "rgba(239,68,68,0.08)"; }}
-            style={{
-              width: "100%", padding: "13px 0", marginTop: 12,
-              borderRadius: 14,
-              border: "1.5px solid rgba(239,68,68,0.35)",
-              background: dark ? "rgba(239,68,68,0.14)" : "rgba(239,68,68,0.08)",
-              color: dark ? "#fca5a5" : "#dc2626",
-              fontWeight: 700, fontSize: 15, cursor: "pointer",
-              transition: "all 220ms ease", letterSpacing: 0.3,
-            }}
-          >
-            Logout
-          </button>
-        </Link>
+        <button
+           type="button"
+           onClick={handleLogout}
+           onMouseEnter={(e) => { e.currentTarget.style.background = "#be123c"; }}
+           onMouseLeave={(e) => { e.currentTarget.style.background = dark ? "rgba(239,68,68,0.14)" : "rgba(239,68,68,0.08)"; }}
+           style={{
+             width: "100%", padding: "13px 0", marginTop: 12,
+             borderRadius: 14,
+             border: "1.5px solid rgba(239,68,68,0.35)",
+             background: dark ? "rgba(239,68,68,0.14)" : "rgba(239,68,68,0.08)",
+             color: dark ? "#fca5a5" : "#dc2626",
+             fontWeight: 700, fontSize: 15, cursor: "pointer",
+             transition: "all 220ms ease", letterSpacing: 0.3,
+           }}
+         >
+           Logout
+         </button>
       </div>
 
       <style>{`
