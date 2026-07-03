@@ -1,6 +1,8 @@
 // UptoSkills design system tokens and page wrapper.
 // Based on the original UptoSkills components: Maindashboard.jsx, EmailSearch.jsx, etc.
 import React from "react";
+import { motion } from "framer-motion";
+import { ArrowRight } from "lucide-react";
 import { useTheme } from "@/context/ThemeContext";
 
 export const uptoskillsTokens = (darkMode) => ({
@@ -99,24 +101,39 @@ export const UptoCard = ({ title, value, icon: Icon, trend, color = "primary", d
   const palette = darkMode ? colorMap[color]?.dark : colorMap[color]?.light;
   if (!palette) return null;
   return (
-    <div
-      className={`rounded-2xl p-6 border transition-colors duration-300 ${
+    <motion.div
+      whileHover={{ y: -4, scale: 1.02 }}
+      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+      className={`group relative rounded-2xl p-6 border transition-all duration-300 overflow-hidden ${
         darkMode ? `${palette.bg} border-slate-700/50` : `${palette.bg} border-transparent`
-      }`}
+      } hover:shadow-xl`}
     >
-      <div className="flex items-center justify-between mb-4">
-        <span className={`text-sm font-medium ${darkMode ? "text-slate-400" : "text-slate-500"}`}>
-          {title}
-        </span>
-        <div className={`p-2 rounded-xl ${palette.icon}`}>
-          <Icon size={18} />
+      <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br from-white/5 to-transparent`} />
+      <div className="relative">
+        <div className="flex items-center justify-between mb-4">
+          <span className={`text-sm font-medium ${darkMode ? "text-slate-400" : "text-slate-500"}`}>
+            {title}
+          </span>
+          <motion.div
+            whileHover={{ scale: 1.1, rotate: 5 }}
+            className={`p-2 rounded-xl ${palette.icon}`}
+          >
+            <Icon size={18} />
+          </motion.div>
         </div>
+        <motion.p
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`text-3xl font-semibold mb-1 ${darkMode ? "text-white" : "text-slate-900"}`}
+        >
+          {value}
+        </motion.p>
+        {trend && <p className={`text-xs font-medium ${palette.trend} flex items-center gap-1`}>
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-current" />
+          {trend}
+        </p>}
       </div>
-      <p className={`text-3xl font-semibold mb-1 ${darkMode ? "text-white" : "text-slate-900"}`}>
-        {value}
-      </p>
-      {trend && <p className={`text-xs font-medium ${palette.trend}`}>{trend}</p>}
-    </div>
+    </motion.div>
   );
 };
 
@@ -146,28 +163,37 @@ export const UptoToolCard = ({ title, description, path, buttonText, icon: Icon,
   const palette = darkMode ? palettes[color]?.dark : palettes[color]?.light;
   if (!palette) return null;
   return (
-    <div
+    <motion.div
       onClick={onClick || (() => {})}
-      className={`group relative bg-gradient-to-br ${palette.gradient} border ${palette.border} rounded-2xl p-7 cursor-pointer overflow-hidden transition-transform duration-200 hover:scale-[1.015]`}
+      whileHover={{ y: -4, scale: 1.015 }}
+      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+      className={`group relative bg-gradient-to-br ${palette.gradient} border ${palette.border} rounded-2xl p-7 cursor-pointer overflow-hidden`}
     >
       <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+      <div className="absolute -inset-1 bg-gradient-to-r from-violet-500/10 to-purple-500/10 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
       <div className="relative">
-        <div className={`inline-flex items-center justify-center p-2.5 rounded-xl mb-4 text-white ${palette.accent.split(" ")[0]}`}>
+        <motion.div
+          whileHover={{ scale: 1.1, rotate: 5 }}
+          className={`inline-flex items-center justify-center p-2.5 rounded-xl mb-4 text-white ${palette.accent.split(" ")[0]}`}
+        >
           {Icon && <Icon size={20} />}
-        </div>
+        </motion.div>
         <h3 className={`text-lg font-semibold mb-2 ${darkMode ? "text-white" : "text-slate-900"}`}>
           {title}
         </h3>
         <p className={`text-sm leading-relaxed mb-6 ${darkMode ? "text-slate-300" : "text-slate-600"}`}>
           {description}
         </p>
-        <button
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
           onClick={(e) => { e.stopPropagation(); onClick ? onClick() : (path && (window.location.href = path)); }}
           className={`inline-flex items-center gap-2 text-white text-sm font-medium px-5 py-2.5 rounded-xl transition-all duration-200 ${palette.accent} shadow-sm hover:shadow-md`}
         >
           {buttonText}
-        </button>
+          <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+        </motion.button>
       </div>
-    </div>
+    </motion.div>
   );
 };

@@ -1,220 +1,111 @@
-import React, { useState, createContext, useContext, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  FaTags,
-  FaLinkedin,
-  FaRocket,
-  FaUserTie,
-  FaUserGraduate,
-  FaTwitter,
-  FaFacebook,
-  FaComments,
-  FaSearch,
-  FaDatabase,
-  FaGlobe,
-  FaLink,
-  FaTimes,
-  FaUsers,
-  FaBuilding,
-  FaChartLine,
-  FaLock,
-  FaBolt,
-  FaArrowRight,
-} from "react-icons/fa";
-
-
-// Public assets should be referenced by URL strings in Vite.
+import { motion } from "framer-motion";
+import { FaLinkedin, FaTwitter, FaFacebook, FaArrowUp } from "react-icons/fa";
+import { Link } from "react-router-dom";
+import { useTheme } from "../../context/ThemeContext";
 import { logoMainImg } from "./landingAssets";
 
-const LOGO_TEXT = "UptoSkills";
-
-// Animation Variants
-const fadeInUp = {
-  hidden: { opacity: 0, y: 30 },
-  visible: (i = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.1, duration: 0.6, ease: "easeOut" },
-  }),
-};
-
-const scaleInUp = {
-  hidden: { opacity: 0, scale: 0.95, y: 20 },
-  visible: (i = 0) => ({
-    opacity: 1,
-    scale: 1,
-    y: 0,
-    transition: { delay: i * 0.08, duration: 0.5, ease: "easeOut" },
-  }),
-};
-
-const slideInRight = {
-  hidden: { opacity: 0, x: 40 },
-  visible: {
-    opacity: 1,
-    x: 0,
-    transition: { duration: 0.6, ease: "easeOut" },
-  },
-};
-
-import { useNavigate, Link } from "react-router-dom";
-import { useTheme } from "../../context/ThemeContext";
-import { ThemeToggle } from "../../context/ThemeToggle";
-
-// ---------- Footer ----------
 function Footer() {
   const { theme } = useTheme();
-      const darkMode = theme === "dark";
+  const darkMode = theme === "dark";
 
-  const footerLinks = [
-    { label: "Features", href: "#features" },
-    { label: "How It Works", href: "#how-it-works" },
-    { label: "Pricing", href: "#pricing" },
-    { label: "Contact", href: "#contact" },
-  ];
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const socialLinks = [
-    { icon: <FaTwitter size={18} />, label: "Twitter" },
-    { icon: <FaLinkedin size={18} />, label: "LinkedIn" },
-    { icon: <FaFacebook size={18} />, label: "Facebook" },
+    { icon: <FaTwitter size={18} />, label: "Twitter", href: "#" },
+    { icon: <FaLinkedin size={18} />, label: "LinkedIn", href: "#" },
+    { icon: <FaFacebook size={18} />, label: "Facebook", href: "#" },
+  ];
+
+  const footerSections = [
+    {
+      title: "Product",
+      links: ["Features", "Pricing", "Security", "Roadmap"],
+    },
+    {
+      title: "Company",
+      links: ["About", "Blog", "Careers", "Contact"],
+    },
+    {
+      title: "Legal",
+      links: ["Privacy", "Terms", "Data Policy", "Compliance"],
+    },
   ];
 
   return (
-    <footer
-      className={`border-t ${
-        darkMode
-          ? "bg-slate-950 border-slate-800"
-          : "bg-gray-50 border-gray-200"
-      }`}
-    >
+    <footer className={`relative border-t ${darkMode ? "bg-slate-950 border-slate-800" : "bg-gray-50 border-gray-200"}`}>
+      <button
+        onClick={scrollToTop}
+        className={`absolute -top-4 right-10 w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 hover:-translate-y-1 ${
+          darkMode ? "bg-slate-800 text-white hover:bg-slate-700" : "bg-white text-gray-900 hover:bg-gray-100"
+        }`}
+        aria-label="Scroll to top"
+      >
+        <FaArrowUp size={14} />
+      </button>
+
       <div className="max-w-7xl mx-auto px-6 md:px-10 py-16">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
-          {/* Brand */}
           <div>
-            <img src={logoMainImg} alt="UptoSkills" className="h-8 w-auto mb-4" />
-            <p
-              className={`text-sm ${
-                darkMode ? "text-gray-400" : "text-gray-600"
-              }`}
-            >
+            <Link to="/" className="inline-block mb-4">
+              <motion.img
+                whileHover={{ scale: 1.05 }}
+                src={logoMainImg}
+                alt="UptoSkills"
+                className="h-10 w-auto"
+              />
+            </Link>
+            <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-600"} leading-relaxed`}>
               Generate leads and grow your business with verified data.
             </p>
           </div>
 
-          {/* Product Links */}
-          <div>
-            <h4
-              className={`font-semibold mb-4 ${
-                darkMode ? "text-white" : "text-gray-900"
-              }`}
-            >
-              Product
-            </h4>
-            <ul className="space-y-3">
-              {["Features", "Pricing", "Security", "Roadmap"].map((link, i) => (
-                <li key={i}>
-                  <a
-                    href="#"
-                    className={`text-sm transition-colors ${
-                      darkMode
-                        ? "text-gray-400 hover:text-white"
-                        : "text-gray-600 hover:text-gray-900"
-                    }`}
-                  >
-                    {link}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Company Links */}
-          <div>
-            <h4
-              className={`font-semibold mb-4 ${
-                darkMode ? "text-white" : "text-gray-900"
-              }`}
-            >
-              Company
-            </h4>
-            <ul className="space-y-3">
-              {["About", "Blog", "Careers", "Contact"].map((link, i) => (
-                <li key={i}>
-                  <a
-                    href="#"
-                    className={`text-sm transition-colors ${
-                      darkMode
-                        ? "text-gray-400 hover:text-white"
-                        : "text-gray-600 hover:text-gray-900"
-                    }`}
-                  >
-                    {link}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Legal Links */}
-          <div>
-            <h4
-              className={`font-semibold mb-4 ${
-                darkMode ? "text-white" : "text-gray-900"
-              }`}
-            >
-              Legal
-            </h4>
-            <ul className="space-y-3">
-              {["Privacy", "Terms", "Data Policy", "Compliance"].map((link, i) => (
-                <li key={i}>
-                  <a
-                    href="#"
-                    className={`text-sm transition-colors ${
-                      darkMode
-                        ? "text-gray-400 hover:text-white"
-                        : "text-gray-600 hover:text-gray-900"
-                    }`}
-                  >
-                    {link}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {footerSections.map((section) => (
+            <div key={section.title}>
+              <h4 className={`font-semibold mb-4 ${darkMode ? "text-white" : "text-gray-900"}`}>
+                {section.title}
+              </h4>
+              <ul className="space-y-3">
+                {section.links.map((link) => (
+                  <li key={link}>
+                    <a
+                      href="#"
+                      className={`text-sm transition-all duration-200 hover:translate-x-1 inline-block ${
+                        darkMode ? "text-gray-400 hover:text-violet-400" : "text-gray-600 hover:text-violet-600"
+                      }`}
+                    >
+                      {link}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
 
-        {/* Divider */}
-        <div
-          className={`h-px mb-8 ${
-            darkMode ? "bg-slate-800" : "bg-gray-200"
-          }`}
-        ></div>
+        <div className={`h-px mb-8 ${darkMode ? "bg-slate-800" : "bg-gray-200"}`} />
 
-        {/* Bottom */}
-        <div className="flex flex-col md:flex-row items-center justify-between">
-          <p
-            className={`text-sm ${
-              darkMode ? "text-gray-400" : "text-gray-600"
-            }`}
-          >
-            © {new Date().getFullYear()} UptoSkills. All rights reserved.
+        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+          <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
+            &copy; {new Date().getFullYear()} UptoSkills. All rights reserved.
           </p>
 
-          {/* Social Links */}
-          <div className="flex items-center gap-4 mt-6 md:mt-0">
+          <div className="flex items-center gap-3">
             {socialLinks.map((social, i) => (
-              <a
+              <motion.a
                 key={i}
-                href="#"
+                href={social.href}
+                whileHover={{ scale: 1.1, y: -2 }}
                 aria-label={social.label}
-                className={`p-2 rounded-lg transition-all ${
+                className={`p-2.5 rounded-xl transition-all ${
                   darkMode
-                    ? "bg-slate-800 text-gray-400 hover:text-white hover:bg-slate-700"
-                    : "bg-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-300"
+                    ? "bg-slate-800 text-gray-400 hover:text-violet-400 hover:bg-slate-700"
+                    : "bg-gray-200 text-gray-600 hover:text-violet-600 hover:bg-gray-300"
                 }`}
               >
                 {social.icon}
-              </a>
+              </motion.a>
             ))}
           </div>
         </div>

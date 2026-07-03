@@ -1,96 +1,65 @@
-import React, { useState, createContext, useContext, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  FaTags,
-  FaLinkedin,
-  FaRocket,
-  FaUserTie,
-  FaUserGraduate,
-  FaTwitter,
-  FaFacebook,
-  FaComments,
-  FaSearch,
-  FaDatabase,
-  FaGlobe,
-  FaLink,
-  FaTimes,
-  FaUsers,
-  FaBuilding,
-  FaChartLine,
-  FaLock,
-  FaBolt,
-  FaArrowRight,
-} from "react-icons/fa";
-
-
-
-const LOGO_TEXT = "UptoSkills";
-
-// Animation Variants
-const fadeInUp = {
-  hidden: { opacity: 0, y: 30 },
-  visible: (i = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.1, duration: 0.6, ease: "easeOut" },
-  }),
-};
-
-const scaleInUp = {
-  hidden: { opacity: 0, scale: 0.95, y: 20 },
-  visible: (i = 0) => ({
-    opacity: 1,
-    scale: 1,
-    y: 0,
-    transition: { delay: i * 0.08, duration: 0.5, ease: "easeOut" },
-  }),
-};
-
-const slideInRight = {
-  hidden: { opacity: 0, x: 40 },
-  visible: {
-    opacity: 1,
-    x: 0,
-    transition: { duration: 0.6, ease: "easeOut" },
-  },
-};
-
-import { useNavigate, Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
 import { useTheme } from "../../context/ThemeContext";
-import { ThemeToggle } from "../../context/ThemeToggle";
+import GlowButton from "@/components/GlowButton";
+import { FaArrowRight, FaRocket } from "react-icons/fa";
 
-// ---------- CTA Section ----------
 function CTA() {
   const { theme } = useTheme();
-      const darkMode = theme === "dark";
+  const darkMode = theme === "dark";
 
   return (
-    <section
-      className={`py-20 ${
-        darkMode
-          ? "bg-gradient-to-r from-slate-900 to-slate-950"
-          : "bg-gradient-to-r from-violet-50 to-purple-50"
-      }`}
-    >
-      <div className="max-w-4xl mx-auto px-6 md:px-10 text-center">
-        <motion.h2
+    <section className="relative py-24 overflow-hidden">
+      <div className={`absolute inset-0 ${darkMode ? "bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900" : "bg-gradient-to-br from-violet-50 via-purple-50 to-indigo-50"}`} />
+      <motion.div
+        className={`absolute w-[300px] h-[300px] rounded-full blur-[100px] opacity-30 ${darkMode ? "bg-violet-600/20" : "bg-violet-300/30"}`}
+        animate={{ x: [0, 30, 0], y: [0, -30, 0] }}
+        transition={{ duration: 8, repeat: Infinity }}
+        style={{ top: "20%", left: "10%" }}
+      />
+      <motion.div
+        className={`absolute w-[200px] h-[200px] rounded-full blur-[80px] opacity-20 ${darkMode ? "bg-purple-600/20" : "bg-purple-300/30"}`}
+        animate={{ x: [0, -20, 0], y: [0, 20, 0] }}
+        transition={{ duration: 10, repeat: Infinity }}
+        style={{ bottom: "20%", right: "15%" }}
+      />
+
+      <div className="max-w-4xl mx-auto px-6 md:px-10 text-center relative z-10">
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className={`text-4xl md:text-5xl font-bold mb-6 ${
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6 bg-violet-100/80 dark:bg-violet-900/30 border border-violet-200 dark:border-violet-800/50"
+        >
+          <FaRocket className="text-violet-500" size={14} />
+          <span className="text-sm font-medium text-violet-700 dark:text-violet-300">
+            Start your journey today
+          </span>
+        </motion.div>
+
+        <motion.h2
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.1 }}
+          className={`text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight ${
             darkMode ? "text-white" : "text-gray-900"
           }`}
         >
-          Ready to Transform Your Lead Generation?
+          Ready to Transform Your{" "}
+          <span className="bg-gradient-to-r from-violet-500 via-purple-500 to-indigo-600 bg-clip-text text-transparent">
+            Lead Generation
+          </span>
+          ?
         </motion.h2>
 
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.1 }}
-          className={`text-lg mb-8 ${
+          transition={{ duration: 0.6, delay: 0.2 }}
+          className={`text-lg mb-10 max-w-2xl mx-auto ${
             darkMode ? "text-gray-300" : "text-gray-600"
           }`}
         >
@@ -102,25 +71,16 @@ function CTA() {
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.2 }}
+          transition={{ duration: 0.6, delay: 0.3 }}
           className="flex flex-col sm:flex-row gap-4 justify-center"
         >
-          <Link
-            to="/signup"
-            className="px-8 py-4 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-lg font-semibold transition-all duration-300 hover:shadow-xl hover:shadow-violet-500/40 hover:scale-105"
-          >
+          <GlowButton href="/signup" size="lg" className="gap-2">
             Start for Free
-          </Link>
-          <button
-            className={`px-8 py-4 rounded-lg font-semibold transition-all duration-300 border ${
-              darkMode
-                ? "border-slate-700 bg-slate-800 hover:bg-slate-700 text-white"
-                : "border-violet-300 bg-white hover:bg-violet-50 text-gray-900"
-            }`}
-          ><Link to="/login">
+            <FaArrowRight size={16} />
+          </GlowButton>
+          <GlowButton variant="secondary" size="lg" href="/login">
             Schedule Demo
-          </Link>
-          </button>
+          </GlowButton>
         </motion.div>
       </div>
     </section>

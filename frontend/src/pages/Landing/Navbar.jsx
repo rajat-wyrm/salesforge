@@ -1,71 +1,15 @@
-import React, { useState, createContext, useContext, useMemo } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  FaTags,
-  FaLinkedin,
-  FaRocket,
-  FaUserTie,
-  FaUserGraduate,
-  FaTwitter,
-  FaFacebook,
-  FaComments,
-  FaSearch,
-  FaDatabase,
-  FaGlobe,
-  FaLink,
-  FaTimes,
-  FaUsers,
-  FaBuilding,
-  FaChartLine,
-  FaLock,
-  FaBolt,
-  FaArrowRight,
-} from "react-icons/fa";
-
-
-// Public assets should be referenced by URL strings in Vite.
-import { logoMainImg } from "./landingAssets";
-
-const LOGO_TEXT = "UptoSkills";
-
-// Animation Variants
-const fadeInUp = {
-  hidden: { opacity: 0, y: 30 },
-  visible: (i = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.1, duration: 0.6, ease: "easeOut" },
-  }),
-};
-
-const scaleInUp = {
-  hidden: { opacity: 0, scale: 0.95, y: 20 },
-  visible: (i = 0) => ({
-    opacity: 1,
-    scale: 1,
-    y: 0,
-    transition: { delay: i * 0.08, duration: 0.5, ease: "easeOut" },
-  }),
-};
-
-const slideInRight = {
-  hidden: { opacity: 0, x: 40 },
-  visible: {
-    opacity: 1,
-    x: 0,
-    transition: { duration: 0.6, ease: "easeOut" },
-  },
-};
-
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useTheme } from "../../context/ThemeContext";
 import { ThemeToggle } from "../../context/ThemeToggle";
+import GlowButton from "@/components/GlowButton";
+import { logoMainImg } from "./landingAssets";
 
 function Navbar() {
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const { theme } = useTheme();
-    const darkMode = theme === "dark";
-    console.log("DarkMode: ", darkMode);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { theme } = useTheme();
+  const darkMode = theme === "dark";
 
   const navLinks = [
     { label: "Features", href: "#features" },
@@ -76,87 +20,77 @@ function Navbar() {
 
   return (
     <header
-      className={`fixed top-0 w-full z-40 transition-all duration-300 ${
+      className={`fixed top-0 w-full z-40 transition-all duration-500 ${
         darkMode
-          ? "bg-slate-950/80 border-slate-800"
-          : "bg-white/80 border-gray-200"
+          ? "bg-slate-950/60 border-slate-800/50"
+          : "bg-white/60 border-gray-200/50"
       } border-b backdrop-blur-xl`}
     >
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center">
-        
-        {/* LEFT - Logo */}
         <div className="flex-1 flex justify-start">
-          <Link to="/" className="flex items-center gap-2">
-            <img
+          <Link to="/" className="flex items-center gap-2 group">
+            <motion.img
+              whileHover={{ scale: 1.05 }}
               src={logoMainImg}
               alt="UptoSkills Logo"
-              className="h-14 w-auto"
+              className="h-14 w-auto transition-transform duration-300"
             />
           </Link>
         </div>
 
-        {/* CENTER - Nav Links */}
         <nav className="hidden md:flex flex-1 justify-center items-center gap-10">
           {navLinks.map((link, i) => (
-            <a
+            <motion.a
               key={i}
               href={link.href}
+              whileHover={{ y: -1 }}
               className={`relative text-sm font-semibold tracking-wide transition-all duration-300 group ${
-                darkMode ? "text-gray-300" : "text-gray-600"
+                darkMode ? "text-gray-300 hover:text-white" : "text-gray-600 hover:text-gray-900"
               }`}
             >
-              <span className="group-hover:scale-105 inline-block transition-transform duration-300">
+              <span className="inline-block transition-transform duration-300 group-hover:scale-105">
                 {link.label}
               </span>
-
               <span
-                className={`absolute left-0 -bottom-1 h-[2px] w-0 transition-all duration-300 group-hover:w-full ${
-                  darkMode ? "bg-white" : "bg-gray-900"
+                className={`absolute left-0 -bottom-1 h-[2px] w-0 transition-all duration-300 group-hover:w-full rounded-full ${
+                  darkMode ? "bg-gradient-to-r from-violet-400 to-purple-400" : "bg-gradient-to-r from-violet-500 to-purple-500"
                 }`}
-              ></span>
-            </a>
+              />
+            </motion.a>
           ))}
         </nav>
 
-        {/* RIGHT - Actions */}
         <div className="flex-1 flex justify-end items-center gap-4">
-          
-          {/* Theme Toggle */}
-          <div>
-            <ThemeToggle/>
-          </div>
+          <ThemeToggle />
 
-          {/* Login */}
           <Link
             to="/login"
-            className={`hidden md:block text-sm font-medium ${
-              darkMode
-                ? "text-gray-400 hover:text-white"
-                : "text-gray-600 hover:text-gray-900"
+            className={`hidden md:block text-sm font-medium transition-colors ${
+              darkMode ? "text-gray-400 hover:text-white" : "text-gray-600 hover:text-gray-900"
             }`}
           >
             Log in
           </Link>
 
-          {/* Sign Up */}
-          <Link
-            to="/signup"
-            className="px-6 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-lg font-medium text-sm hover:scale-105 transition"
-          >
+          <GlowButton href="/signup" size="sm">
             Sign Up
-          </Link>
+          </GlowButton>
 
-          {/* Mobile Menu */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden text-xl"
+            className="md:hidden text-xl p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+            aria-label="Toggle menu"
           >
-            {mobileMenuOpen ? "✕" : "☰"}
+            <motion.div
+              animate={{ rotate: mobileMenuOpen ? 90 : 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              {mobileMenuOpen ? "✕" : "☰"}
+            </motion.div>
           </button>
         </div>
       </div>
 
-      {/* Mobile Menu */}
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
@@ -164,19 +98,38 @@ function Navbar() {
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             className={`md:hidden px-6 py-4 space-y-3 border-t ${
-              darkMode ? "border-slate-800 bg-slate-900/50" : "border-gray-200 bg-gray-50/50"
+              darkMode ? "border-slate-800 bg-slate-900/80 backdrop-blur-xl" : "border-gray-200 bg-white/80 backdrop-blur-xl"
             }`}
           >
             {navLinks.map((link, i) => (
-              <a
+              <motion.a
                 key={i}
                 href={link.href}
-                className="block text-sm font-medium py-2"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.05 }}
+                className="block text-sm font-medium py-2 hover:text-violet-500 transition-colors"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 {link.label}
-              </a>
+              </motion.a>
             ))}
+            <div className="pt-2 flex gap-3">
+              <Link
+                to="/login"
+                className="flex-1 text-center px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-sm font-medium"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Log in
+              </Link>
+              <Link
+                to="/signup"
+                className="flex-1 text-center px-4 py-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-lg text-sm font-medium"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Sign Up
+              </Link>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

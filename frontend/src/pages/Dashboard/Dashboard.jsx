@@ -6,6 +6,7 @@ import { UptoError as ErrorBanner, UptoSpinner as FullPageSpinner, UptoBadge as 
 import { Activity, BarChart3, TrendingUp, Users, Target, Search, MailCheck, Globe2, Link2, Sparkles, AlertCircle, Zap, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import AnimatedBackground from "@/components/AnimatedBackground";
 
 const Dashboard = () => {
   const { theme } = useTheme();
@@ -60,6 +61,7 @@ const Dashboard = () => {
 
   return (
     <UptoPage>
+      <AnimatedBackground />
       {/* Hero section matching Maindashboard */}
       <div className="relative overflow-hidden -mx-6 md:-mx-10 lg:-mx-16 px-6 md:px-10 lg:px-16 py-12 md:py-16">
         <div className="absolute inset-0 pointer-events-none">

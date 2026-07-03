@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { notificationService } from "@/services";
 import { openEventStream } from "@/lib/api";
 import { Bell } from "lucide-react";
@@ -46,42 +47,58 @@ const NotificationBell = () => {
 
   return (
     <div className="relative">
-      <button
+      <motion.button
         type="button"
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
         onClick={() => setOpen((p) => !p)}
-        className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 shadow-sm transition hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+        className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200/80 bg-white/50 text-gray-600 shadow-sm backdrop-blur-sm transition hover:bg-gray-100 dark:border-gray-700/50 dark:bg-gray-800/50 dark:text-gray-300"
         aria-label="Notifications"
       >
         <Bell className="h-5 w-5" />
         {unread > 0 && (
-          <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
+          <motion.span
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="absolute -right-1 -top-1 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-gradient-to-r from-red-500 to-rose-500 px-1 text-[10px] font-semibold text-white shadow-lg shadow-red-500/30"
+          >
             {unread > 99 ? "99+" : unread}
-          </span>
+          </motion.span>
         )}
-      </button>
+      </motion.button>
       {open && (
-        <div className="absolute right-0 z-40 mt-2 w-80 max-w-[90vw] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-900">
-          <div className="flex items-center justify-between border-b border-gray-200 px-4 py-2 text-sm font-semibold dark:border-gray-800">
+        <motion.div
+          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 10, scale: 0.95 }}
+          className="absolute right-0 z-40 mt-2 w-80 max-w-[90vw] overflow-hidden rounded-2xl border border-gray-200/80 bg-white/95 backdrop-blur-xl shadow-2xl dark:border-gray-800/50 dark:bg-gray-900/95"
+        >
+          <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 text-sm font-semibold dark:border-gray-800">
             <span>Notifications</span>
-            <button onClick={markAll} className="text-xs font-normal text-teal-600 hover:underline">Mark all read</button>
+            <button onClick={markAll} className="text-xs font-normal text-teal-600 hover:text-teal-500 transition-colors">Mark all read</button>
           </div>
           <ul className="max-h-80 divide-y divide-gray-100 overflow-y-auto dark:divide-gray-800">
             {items.length === 0 ? (
-              <li className="px-4 py-6 text-center text-sm text-gray-500">No notifications yet.</li>
+              <li className="px-4 py-8 text-center text-sm text-gray-500">No notifications yet.</li>
             ) : items.map((n) => (
-              <li key={n.id} className={`flex items-start gap-2 px-4 py-3 text-sm ${n.is_read ? "" : "bg-teal-50/50 dark:bg-teal-900/10"}`}>
-                <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full" style={{ background: n.is_read ? "transparent" : "#14b8a6" }} />
-                <div className="flex-1">
-                  <p className="font-medium text-gray-900 dark:text-white">{n.message}</p>
-                  <p className="text-xs text-gray-500">{n.type} · {new Date(n.createdAt).toLocaleString()}</p>
+              <motion.li
+                key={n.id}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                className={`flex items-start gap-3 px-4 py-3 text-sm transition-colors ${n.is_read ? "" : "bg-gradient-to-r from-teal-50/80 to-transparent dark:from-teal-900/20 dark:to-transparent"}`}
+              >
+                <div className={`mt-1 h-2 w-2 shrink-0 rounded-full ${n.is_read ? "bg-transparent" : "bg-teal-500 shadow-lg shadow-teal-500/50"}`} />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-gray-900 dark:text-white truncate">{n.message}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{n.type} · {new Date(n.createdAt).toLocaleString()}</p>
                 </div>
                 {!n.is_read && (
-                  <button onClick={() => markOne(n.id)} className="text-xs text-teal-600 hover:underline">Read</button>
+                  <button onClick={() => markOne(n.id)} className="text-xs font-medium text-teal-600 hover:text-teal-500 shrink-0">Read</button>
                 )}
-              </li>
+              </motion.li>
             ))}
           </ul>
-        </div>
+        </motion.div>
       )}
     </div>
   );

@@ -48,6 +48,12 @@
   
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-float-slow: float 8s ease-in-out infinite;
+  --animate-float-slower: float 10s ease-in-out infinite;
+  --animate-glow-pulse: glow-pulse 3s ease-in-out infinite;
+  --animate-gradient-shift: gradient-shift 8s ease infinite;
+  --animate-shimmer: shimmer 3s ease-in-out infinite;
   
   @keyframes accordion-down {
     from { height: 0; }
@@ -56,6 +62,23 @@
   @keyframes accordion-up {
     from { height: var(--radix-accordion-content-height); }
     to { height: 0; }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+  }
+  @keyframes glow-pulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+  @keyframes gradient-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  @keyframes shimmer {
+    0% { background-position: -200% center; }
+    100% { background-position: 200% center; }
   }
 }
 
@@ -155,6 +178,7 @@
   html {
     min-height: 100%;
     background-color: hsl(var(--background));
+    scroll-behavior: smooth;
   }
   body {
     @apply min-h-screen bg-background text-foreground transition-colors duration-300;
@@ -162,5 +186,40 @@
   }
   #root {
     min-height: 100vh;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply text-transparent bg-clip-text bg-gradient-to-r from-violet-500 via-purple-500 to-indigo-600;
+  }
+  .glass {
+    @apply backdrop-blur-xl bg-white/70 dark:bg-slate-950/70 border border-white/20 dark:border-slate-800/50;
+  }
+  .glass-card {
+    @apply backdrop-blur-md bg-white/50 dark:bg-slate-900/50 border border-gray-200/50 dark:border-slate-700/50 shadow-lg shadow-violet-500/5;
+  }
+  .glow-border {
+    @apply relative;
+  }
+  .glow-border::before {
+    content: '';
+    @apply absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-300;
+    background: linear-gradient(135deg, rgba(139,92,246,0.2), rgba(168,85,247,0.2));
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    padding: 1px;
+  }
+  .glow-border:hover::before {
+    @apply opacity-100;
+  }
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+  .animate-float-slow {
+    animation: float 8s ease-in-out infinite;
+  }
+  .animate-float-slower {
+    animation: float 10s ease-in-out infinite;
   }
 }

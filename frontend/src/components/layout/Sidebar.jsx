@@ -1,5 +1,6 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import React, { useState } from "react";
+import { motion } from "framer-motion";
 import {
   Database, Globe, LayoutDashboard, Link2, LogOut, Mail, Settings, Users,
   Building2, Briefcase, CreditCard, Key, Webhook, Shield, BarChart3, Activity,
@@ -94,8 +95,11 @@ const Sidebar = () => {
       }`}
     >
       <Link to="/dashboard">
-        <div className="mb-6 flex items-center gap-3 rounded-2xl bg-white px-3 py-3 shadow-sm transition-colors duration-300 dark:bg-gray-900">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-teal-500 text-lg font-bold text-white shadow-lg shadow-teal-500/30">
+        <motion.div
+          whileHover={{ scale: 1.02 }}
+          className="mb-6 flex items-center gap-3 rounded-2xl bg-white px-3 py-3 shadow-sm transition-colors duration-300 dark:bg-gray-900"
+        >
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-400 to-teal-600 text-lg font-bold text-white shadow-lg shadow-teal-500/30">
             U
           </div>
           {isExpanded && (
@@ -108,7 +112,7 @@ const Sidebar = () => {
               </p>
             </div>
           )}
-        </div>
+        </motion.div>
       </Link>
 
       <nav className="flex flex-1 flex-col gap-1">
@@ -124,21 +128,23 @@ const Sidebar = () => {
                 {item.children.map((child) => {
                   const isActive = location.pathname === child.path;
                   return (
-                    <button
+                    <motion.button
                       key={child.path}
                       type="button"
+                      whileHover={{ x: isExpanded ? 3 : 0 }}
                       onClick={() => navigate(child.path)}
                       className={`group relative flex w-full items-center rounded-2xl px-4 py-2 text-sm font-medium transition-colors duration-300 ${
                         isExpanded ? "justify-start" : "justify-center"
                       } ${
                         isActive
-                          ? "bg-teal-50 text-teal-700 shadow-sm dark:bg-teal-500/10 dark:text-teal-300"
+                          ? "bg-gradient-to-r from-teal-50 to-teal-100/50 text-teal-700 shadow-sm dark:from-teal-500/10 dark:to-teal-500/5 dark:text-teal-300"
                           : "text-gray-600 hover:bg-white hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700"
                       }`}
                     >
                       {child.icon && <child.icon className={`h-4 w-4 shrink-0 ${isExpanded ? "mr-2" : ""}`} />}
                       {isExpanded && <span className="truncate">{child.name}</span>}
-                    </button>
+                      {isActive && <span className="ml-auto h-2 w-2 rounded-full bg-teal-500 dark:bg-teal-400 animate-pulse" />}
+                    </motion.button>
                   );
                 })}
               </div>
@@ -146,35 +152,42 @@ const Sidebar = () => {
           }
           const isActive = location.pathname === item.path;
           return (
-            <button
+            <motion.button
               key={item.path}
               type="button"
+              whileHover={{ x: isExpanded ? 3 : 0 }}
               onClick={() => navigate(item.path)}
               className={`group relative flex w-full items-center rounded-2xl px-4 py-3 text-sm font-medium transition-colors duration-300 ${
                 isExpanded ? "justify-start" : "justify-center"
               } ${
                 isActive
-                  ? "bg-teal-50 text-teal-700 shadow-sm dark:bg-teal-500/10 dark:text-teal-300"
+                  ? "bg-gradient-to-r from-teal-50 to-teal-100/50 text-teal-700 shadow-sm dark:from-teal-500/10 dark:to-teal-500/5 dark:text-teal-300"
                   : "text-gray-600 hover:bg-white hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700"
               }`}
               title={isExpanded ? undefined : item.name}
             >
               {item.icon && <item.icon className={`h-5 w-5 shrink-0 ${isExpanded ? "mr-3" : ""}`} />}
               {isExpanded && <span className="truncate">{item.name}</span>}
-              {isActive && isExpanded && (
-                <span className="ml-auto h-2.5 w-2.5 rounded-full bg-teal-500 dark:bg-teal-400" />
+              {isActive && (
+                <motion.span
+                  layoutId="activeNav"
+                  className="ml-auto h-2.5 w-2.5 rounded-full bg-teal-500 dark:bg-teal-400 shadow-lg shadow-teal-500/50"
+                />
               )}
-            </button>
+            </motion.button>
           );
         })}
       </nav>
 
       <div className="mt-6 border-t border-gray-200 pt-4 transition-colors duration-300 dark:border-gray-700">
         <Link to="/settings">
-          <div className={`mb-3 flex items-center rounded-2xl bg-white px-3 py-3 shadow-sm dark:bg-gray-900 ${
-            isExpanded ? "justify-start" : "justify-center"
-          }`}>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500 text-sm font-semibold text-white">
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            className={`mb-3 flex items-center rounded-2xl bg-white px-3 py-3 shadow-sm dark:bg-gray-900 ${
+              isExpanded ? "justify-start" : "justify-center"
+            }`}
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-blue-600 text-sm font-semibold text-white shadow-lg shadow-blue-500/30">
               {userInitial}
             </div>
             {isExpanded && (
@@ -183,10 +196,11 @@ const Sidebar = () => {
                 <p className="truncate text-xs text-gray-500 dark:text-gray-400">{user?.role || "Member"}</p>
               </div>
             )}
-          </div>
+          </motion.div>
         </Link>
-        <button
+        <motion.button
           type="button"
+          whileHover={{ x: 3 }}
           onClick={handleLogout}
           className={`flex w-full items-center rounded-2xl px-3 py-2 text-sm text-gray-600 hover:bg-white hover:text-red-500 dark:text-gray-300 dark:hover:bg-gray-700 ${
             isExpanded ? "justify-start" : "justify-center"
@@ -194,7 +208,7 @@ const Sidebar = () => {
         >
           <LogOut className={`h-4 w-4 ${isExpanded ? "mr-2" : ""}`} />
           {isExpanded && "Sign out"}
-        </button>
+        </motion.button>
       </div>
     </aside>
   );
