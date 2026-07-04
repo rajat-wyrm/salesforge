@@ -58,6 +58,7 @@ export const AuthProvider = ({ children }) => {
     tokenStore.clear();
     setUser(null);
     setOrganization(null);
+    localStorage.removeItem("chatHistory");
   }, []);
 
   const updateUser = useCallback((next) => {

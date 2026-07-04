@@ -6,6 +6,7 @@ const sessionService = require("../services/sessionService");
 const extractToken = (req) => {
   const header = req.headers.authorization || "";
   if (header.startsWith("Bearer ")) return header.split(" ")[1];
+  if (req.query && req.query.token) return req.query.token;
   return null;
 };
 

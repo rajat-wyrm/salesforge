@@ -76,6 +76,7 @@ const userRoutes = require("./routes/userRoutes");
 const webhookRoutes = require("./routes/webhookRoutes");
 const webhookIncomingRoutes = require("./routes/webhookIncomingRoutes");
 const workflowRoutes = require("./routes/workflowRoutes");
+const chatRoutes = require("./routes/chatRoutes");
 
 // Optional feature routes
 let aiRoutes;
@@ -92,6 +93,8 @@ const allowedOrigins = new Set([
   frontendUrl,
   "http://localhost:5173",
   "http://127.0.0.1:5173",
+  "http://localhost:5174",
+  "http://127.0.0.1:5174",
   "http://localhost:4173",
   "http://127.0.0.1:4173",
 ]);
@@ -227,6 +230,7 @@ app.use("/api/win-loss", winLossRoutes);
 app.use("/api/onboarding", onboardingRoutes);
 app.use("/api/changelog", changelogRoutes);
 app.use("/api/gdpr", gdprRoutes);
+app.use("/api/ai/chat", chatRoutes);
 
 if (aiRoutes) app.use("/api/ai", aiRoutes);
 if (blockchainRoutes) app.use("/api/blockchain", blockchainRoutes);

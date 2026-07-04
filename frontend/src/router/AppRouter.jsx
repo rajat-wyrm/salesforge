@@ -4,6 +4,7 @@ import {
 } from "react-router-dom";
 import ErrorBoundary from "../ErrorBoundary";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { ChatProvider } from "@/context/ChatContext";
 import ChatBot from "../components/ChatBot";
 import CommandPalette from "@/components/CommandPalette";
 
@@ -73,8 +74,9 @@ const ScrollToTop = () => {
 
 const App = () => (
   <AuthProvider>
-    <BrowserRouter>
-      <ScrollToTop />
+    <ChatProvider>
+      <BrowserRouter>
+        <ScrollToTop />
       <Routes>
         <Route path="/" element={<ErrorBoundary><RootRedirect /></ErrorBoundary>} />
         <Route path="/login-gateway" element={<Navigate to="/login" replace />} />
@@ -171,6 +173,7 @@ const App = () => (
       <ChatBot />
       <CommandPalette />
     </BrowserRouter>
+    </ChatProvider>
   </AuthProvider>
 );
 

@@ -1,17 +1,30 @@
 import { useState, useRef, useEffect } from "react";
-import { X, Send } from "lucide-react";
+import { X, Send, Trash2 } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
+import { useAuth } from "../context/AuthContext";
+import { useChat } from "../context/ChatContext";
+import api from "../lib/api";
 
 export default function ChatBot() {
     const location = useLocation();
+    const { user } = useAuth();
+    const { messages, setMessages, isOpen, setIsOpen, clearChat } = useChat();
     const { theme } = useTheme();
     const darkMode = theme === "dark";
-    const [isOpen, setIsOpen] = useState(false);
-    const [messages, setMessages] = useState([]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
     const messagesEndRef = useRef(null);
+
+    useEffect(() => {
+        console.log("[DEBUG] [ChatBot] Mounted. location:", location.pathname, "messages length:", messages.length);
+        return () => console.log("[DEBUG] [ChatBot] UNMOUNTED!");
+    }, []);
+
+    // Log every render to track state validity across navigations
+    useEffect(() => {
+        console.log(`[DEBUG] [ChatBot] Render trace - Path: ${location.pathname}, UserID: ${user ? user.id : 'none'}, Messages: ${messages.length}, isOpen: ${isOpen}`);
+    });
 
     // 1. VISIBILITY CHECK (Blocklist approach)
     // Hide Chatbot ONLY on login/register pages
@@ -41,24 +54,6 @@ export default function ChatBot() {
         }
     }, [messages, isOpen, isHidden]);
 
-    // 4. AUTO-RESET / WELCOME MESSAGE
-    useEffect(() => {
-        // Skip if hidden
-        if (isHidden) return;
-
-        let welcomeMsg = "Hello! I can provide insights on Global System stats.";
-
-        if (isLandingContext) {
-            welcomeMsg = "Hi, I'm your Fintech assistant. What do you want to do right now: find new leads or manage existing ones?";
-        } else if (isUserContext) {
-            welcomeMsg = "Hello! Ask me about your personal logins and activity.";
-        } else if (location.pathname.includes('admin')) {
-            welcomeMsg = "Hello Admin! Ask me about system-wide performance and metrics.";
-        }
-
-        setMessages([{ text: welcomeMsg, sender: "bot" }]);
-    }, [location.pathname, isUserContext, isLandingContext, isHidden]);
-
     // 5. EARLY RETURN - AFTER all hooks are called
     if (isHidden) {
         return null;
@@ -66,36 +61,49 @@ export default function ChatBot() {
 
     // 4. SEND MESSAGE LOGIC
     const handleSend = async () => {
-        if (!input.trim()) return;
+        console.log("[DEBUG] [ChatBot] handleSend called! Input:", input);
+        if (!input.trim()) {
+            console.log("[DEBUG] [ChatBot] Input is empty, aborting handleSend.");
+            return;
+        }
 
         const userMessage = input;
+        console.log("[DEBUG] [ChatBot] Setting user message in UI:", userMessage);
         setMessages((prev) => [...prev, { text: userMessage, sender: "user" }]);
         setInput("");
         setLoading(true);
 
         try {
-            // Retrieve User ID to send context
-            const userId = localStorage.getItem("userId");
+            const userId = user ? String(user.id) : null;
+            const requestPayload = {
+                message: userMessage,
+                context: context,
+                userId: userId
+            };
+            
+            console.log("[DEBUG] [ChatBot] Sending request to /ai/chat with payload:", requestPayload);
+            const response = await api.post("/ai/chat", requestPayload);
+            
+            console.log("[DEBUG] [ChatBot] Received response. Status:", response.status, "Body:", response.data);
 
-            const response = await fetch("http://localhost:3000/api/chat", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    message: userMessage,
-                    context: context,
-                    userId: userId // Pass dynamic ID
-                }),
+            const botReply = response.data?.data?.reply || response.data?.reply || "I received a response, but it was empty.";
+            
+            console.log("[DEBUG] [ChatBot] Executing setMessages with botReply:", botReply);
+            setMessages((prev) => {
+                console.log("[DEBUG] [ChatBot] setMessages callback running. Prev length:", prev.length);
+                return [...prev, { text: botReply, sender: "bot" }];
             });
-
-            const data = await response.json();
-            setMessages((prev) => [...prev, { text: data.reply, sender: "bot" }]);
         } catch (error) {
-            console.error("Chat error:", error);
+            console.error("[DEBUG] [ChatBot] Chat error occurred:", error);
+            if (error.response) {
+                console.error("[DEBUG] [ChatBot] Error Response Status:", error.response.status, "Data:", error.response.data);
+            }
             setMessages((prev) => [
                 ...prev,
                 { text: "Sorry, I can't reach the server right now.", sender: "bot" },
             ]);
         } finally {
+            console.log("[DEBUG] [ChatBot] handleSend finally block reached, setting loading to false.");
             setLoading(false);
         }
     };
@@ -108,13 +116,24 @@ export default function ChatBot() {
 
                     {/* Header */}
                     <div className="bg-[#2DD4BF] h-32 relative flex justify-center items-center">
-                        <button
-                            onClick={() => setIsOpen(false)}
-                            className="absolute top-4 right-4 text-white hover:bg-white/20 p-1 rounded transition-colors"
-                            aria-label="Close"
-                        >
-                            <X className="w-6 h-6" />
-                        </button>
+                        <div className="absolute top-4 right-4 flex gap-1">
+                            <button
+                                onClick={clearChat}
+                                className="text-white hover:bg-white/20 p-1 rounded transition-colors"
+                                aria-label="New Chat"
+                                title="New Chat"
+                            >
+                                <Trash2 className="w-5 h-5" />
+                            </button>
+                            <button
+                                onClick={() => setIsOpen(false)}
+                                className="text-white hover:bg-white/20 p-1 rounded transition-colors"
+                                aria-label="Close"
+                                title="Close"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
 
                         {/* Logo Container (White Oval) */}
                         <div className="bg-white px-6 py-2 rounded-full shadow-sm">
