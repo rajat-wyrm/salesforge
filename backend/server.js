@@ -11,6 +11,13 @@ const startServer = async (port = Number(process.env.PORT || 3000)) => {
   const server = app.listen(port, () => {
     if (process.env.NODE_ENV !== "test") {
       logger.info("server.started", { port, env: process.env.NODE_ENV || "development" });
+      console.log(`
+  ⚡ SalesForge API is LIVE
+  ════════════════════════
+  🚀  Port  : ${port}
+  🌍  Env   : ${process.env.NODE_ENV || "development"}
+  ⏰  Time  : ${new Date().toLocaleString()}
+  `);
     }
   });
 
