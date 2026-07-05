@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { dealService } from "@/services";
 import { useUptoStyles, UptoPage, UptoHero, UptoSectionHeading, UptoButton, UptoInput, UptoSelect, UptoBadge, UptoSpinner, UptoError, UptoEmptyState, UptoCard, UptoProgressBar } from "@/components/UI/UptoHooks";
 import { openEventStream } from "@/lib/api";
-import { Briefcase, Plus, DollarSign, TrendingUp, Target, GripVertical, ListChecks } from "lucide-react";
+import { Plus, DollarSign, TrendingUp, Target, GripVertical, ListChecks } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 
@@ -27,7 +27,7 @@ const Deals = () => {
       const [k, m] = await Promise.all([dealService.kanban(), dealService.metrics()]);
       setKanban(k || []);
       setMetrics(m);
-    } catch (e) { setError(e.message); }
+    } catch (e) { setError(e?.message || "Failed to load deals."); }
     finally { setLoading(false); }
   }, []);
 
@@ -72,7 +72,7 @@ const Deals = () => {
     <UptoPage>
       <UptoHero
         title="Deals"
-        subtitle={metrics ? `${metrics.open.count} open · $${(metrics.open.amount || 0).toLocaleString()} in pipeline` : "Sales pipeline"}
+        subtitle={metrics ? `${metrics.open ?? 0} open · $${(metrics.pipelineValue || 0).toLocaleString()} in pipeline` : "Sales pipeline"}
         darkMode={darkMode}
         actions={isMember && <UptoButton onClick={() => { setCreateStage(kanban[0]?.id); setShowCreate(true); }}><Plus className="h-4 w-4" /> New Deal</UptoButton>}
       />
@@ -83,17 +83,17 @@ const Deals = () => {
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <UptoCard>
               <p className={`text-xs uppercase ${s.subtext}`}>Open</p>
-              <p className={`mt-1 text-2xl font-bold ${s.heading}`}>{metrics.open.count}</p>
-              <p className={`text-xs ${s.muted}`}>${(metrics.open.amount || 0).toLocaleString()}</p>
+              <p className={`mt-1 text-2xl font-bold ${s.heading}`}>{metrics.open}</p>
+              <p className={`text-xs ${s.muted}`}>${(metrics.pipelineValue || 0).toLocaleString()}</p>
             </UptoCard>
             <UptoCard>
               <p className={`text-xs uppercase ${s.subtext}`}>Commit</p>
-              <p className="mt-1 text-2xl font-bold text-emerald-600 dark:text-emerald-400">${(metrics.commit.amount || 0).toLocaleString()}</p>
+              <p className="mt-1 text-2xl font-bold text-emerald-600 dark:text-emerald-400">${(metrics.commit || 0).toLocaleString()}</p>
               <p className={`text-xs ${s.muted}`}>≥75% probability</p>
             </UptoCard>
             <UptoCard>
               <p className={`text-xs uppercase ${s.subtext}`}>Best Case</p>
-              <p className="mt-1 text-2xl font-bold text-amber-600 dark:text-amber-400">${(metrics.bestCase.amount || 0).toLocaleString()}</p>
+              <p className="mt-1 text-2xl font-bold text-amber-600 dark:text-amber-400">${(metrics.weightedPipeline || 0).toLocaleString()}</p>
               <p className={`text-xs ${s.muted}`}>≥50% probability</p>
             </UptoCard>
             <UptoCard>
