@@ -16,94 +16,65 @@ export default function ChatBot() {
     const [loading, setLoading] = useState(false);
     const messagesEndRef = useRef(null);
 
-    useEffect(() => {
-        console.log("[DEBUG] [ChatBot] Mounted. location:", location.pathname, "messages length:", messages.length);
-        return () => console.log("[DEBUG] [ChatBot] UNMOUNTED!");
-    }, []);
-
-    // Log every render to track state validity across navigations
-    useEffect(() => {
-        console.log(`[DEBUG] [ChatBot] Render trace - Path: ${location.pathname}, UserID: ${user ? user.id : 'none'}, Messages: ${messages.length}, isOpen: ${isOpen}`);
-    });
-
     // 1. VISIBILITY CHECK (Blocklist approach)
-    // Hide Chatbot ONLY on login/register pages
     const hiddenPathnames = ['/login', '/signup', '/register', '/admin-login'];
     const isHidden = hiddenPathnames.includes(location.pathname);
 
-    // 2. CONTEXT LOGIC - Compute BEFORE hooks that depend on it
-    // Determine context based on current route
+    // 2. CONTEXT LOGIC
     const getContext = () => {
         if (location.pathname === '/') return 'landing';
         if (location.pathname.includes('my-dashboard') || location.pathname.includes('user-dashboard')) return 'user';
         return 'global';
     };
     const context = getContext();
-    const isUserContext = context === 'user';
-    const isLandingContext = context === 'landing';
 
     // Scroll Logic
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
-    // 3. ALL HOOKS MUST BE CALLED UNCONDITIONALLY (before any early returns)
+    // 3. ALL HOOKS CALLED UNCONDITIONALLY
     useEffect(() => {
         if (!isHidden) {
             scrollToBottom();
         }
     }, [messages, isOpen, isHidden]);
 
-    // 5. EARLY RETURN - AFTER all hooks are called
+    // 4. EARLY RETURN - AFTER all hooks
     if (isHidden) {
         return null;
     }
 
-    // 4. SEND MESSAGE LOGIC
+    // 5. SEND MESSAGE LOGIC
     const handleSend = async () => {
-        console.log("[DEBUG] [ChatBot] handleSend called! Input:", input);
-        if (!input.trim()) {
-            console.log("[DEBUG] [ChatBot] Input is empty, aborting handleSend.");
-            return;
-        }
+        if (!input.trim()) return;
 
         const userMessage = input;
-        console.log("[DEBUG] [ChatBot] Setting user message in UI:", userMessage);
         setMessages((prev) => [...prev, { text: userMessage, sender: "user" }]);
         setInput("");
         setLoading(true);
 
         try {
             const userId = user ? String(user.id) : null;
+            const history = messages.map((m) => ({ text: m.text, sender: m.sender }));
             const requestPayload = {
                 message: userMessage,
-                context: context,
-                userId: userId
+                history,
+                context,
+                userId
             };
-            
-            console.log("[DEBUG] [ChatBot] Sending request to /ai/chat with payload:", requestPayload);
+
             const response = await api.post("/ai/chat", requestPayload);
-            
-            console.log("[DEBUG] [ChatBot] Received response. Status:", response.status, "Body:", response.data);
 
             const botReply = response.data?.data?.reply || response.data?.reply || "I received a response, but it was empty.";
-            
-            console.log("[DEBUG] [ChatBot] Executing setMessages with botReply:", botReply);
-            setMessages((prev) => {
-                console.log("[DEBUG] [ChatBot] setMessages callback running. Prev length:", prev.length);
-                return [...prev, { text: botReply, sender: "bot" }];
-            });
+
+            setMessages((prev) => [...prev, { text: botReply, sender: "bot" }]);
         } catch (error) {
-            console.error("[DEBUG] [ChatBot] Chat error occurred:", error);
-            if (error.response) {
-                console.error("[DEBUG] [ChatBot] Error Response Status:", error.response.status, "Data:", error.response.data);
-            }
             setMessages((prev) => [
                 ...prev,
                 { text: "Sorry, I can't reach the server right now.", sender: "bot" },
             ]);
         } finally {
-            console.log("[DEBUG] [ChatBot] handleSend finally block reached, setting loading to false.");
             setLoading(false);
         }
     };
