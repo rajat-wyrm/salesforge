@@ -96,7 +96,7 @@ const complete = asyncHandler(async (req, res) => {
     where: { id: Number(req.params.id), orgId: req.orgId },
     data: { status: "COMPLETED", completedAt: new Date(), outcome: outcome || null },
   });
-  if (result.count === 0) throw new AppError("Activity not found.", 404);
+  if (result.count === 0) throw new AppError("Activity found.", 404);
   return response.success(res, { message: "Activity completed." });
 });
 
