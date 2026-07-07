@@ -1,4 +1,4 @@
-import React, { useState, createContext, useContext, useMemo } from "react";
+import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FaTags,
@@ -21,7 +21,6 @@ import {
   FaBolt,
   FaArrowRight,
 } from "react-icons/fa";
-
 
 // Public assets should be referenced by URL strings in Vite.
 import { logoMainImg } from "./landingAssets";
@@ -62,10 +61,10 @@ import { useTheme } from "../../context/ThemeContext";
 import { ThemeToggle } from "../../context/ThemeToggle";
 
 function Navbar() {
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const { theme } = useTheme();
-    const darkMode = theme === "dark";
-    console.log("DarkMode: ", darkMode);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { theme } = useTheme();
+  const darkMode = theme === "dark";
+  console.log("DarkMode: ", darkMode);
 
   const navLinks = [
     { label: "Features", href: "#features" },
@@ -146,12 +145,22 @@ function Navbar() {
             Sign Up
           </Link>
 
-          {/* Mobile Menu */}
+          {/* Mobile Menu Toggle Button (BULLETPROOF SVG ICON) */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden text-xl"
+            className={`md:hidden p-2 rounded-md transition-colors focus:outline-none ${
+              darkMode ? "text-gray-100 hover:bg-slate-800" : "text-gray-900 hover:bg-gray-100"
+            }`}
           >
-            {mobileMenuOpen ? "✕" : "☰"}
+            {mobileMenuOpen ? (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            )}
           </button>
         </div>
       </div>
@@ -163,15 +172,19 @@ function Navbar() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className={`md:hidden px-6 py-4 space-y-3 border-t ${
-              darkMode ? "border-slate-800 bg-slate-900/50" : "border-gray-200 bg-gray-50/50"
+            className={`md:hidden px-4 py-4 space-y-2 border-t ${
+              darkMode ? "border-slate-800 bg-slate-900" : "border-gray-200 bg-gray-50"
             }`}
           >
             {navLinks.map((link, i) => (
               <a
                 key={i}
                 href={link.href}
-                className="block text-sm font-medium py-2"
+                className={`block px-4 py-3 text-base font-semibold rounded-lg transition-colors duration-200 ${
+                  darkMode 
+                    ? "text-gray-100 hover:bg-slate-800" 
+                    : "text-gray-900 hover:bg-gray-200"
+                }`}
                 onClick={() => setMobileMenuOpen(false)}
               >
                 {link.label}
