@@ -68,7 +68,7 @@ const Dashboard = () => {
         </div>
         <div className="relative max-w-3xl">
           <h1 className={`text-3xl md:text-4xl font-semibold mb-4 leading-tight ${heading}`}>
-            Welcome back to <span className="bg-gradient-to-r from-[#00b5ad] to-[#e76937] bg-clip-text text-transparent">UptoSkills</span>
+            Welcome back to <span className="bg-linear-to-r from-[#00b5ad] to-[#e76937] bg-clip-text text-transparent">UptoSkills</span>
           </h1>
           <p className={`text-base leading-relaxed ${body}`}>
             Access your powerful lead generation and CRM tools to find verified contacts, build targeted lists, and accelerate your sales process.
@@ -162,7 +162,7 @@ const Dashboard = () => {
                       <span className={subtext}>{used} / {limit}</span>
                     </div>
                     <div className={`h-2 w-full overflow-hidden rounded-full ${darkMode ? "bg-slate-800" : "bg-slate-100"}`}>
-                      <div className="h-full bg-gradient-to-r from-[#00b5ad] to-[#2dd4bf] transition-all" style={{ width: `${pct}%` }} />
+                      <div className="h-full bg-linear-to-r from-[#00b5ad] to-[#2dd4bf] transition-all" style={{ width: `${pct}%` }} />
                     </div>
                   </div>
                 );

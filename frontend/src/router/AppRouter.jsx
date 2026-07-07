@@ -1,9 +1,10 @@
-import React, { useLayoutEffect, useState, useEffect } from "react";
+import React, { useLayoutEffect } from "react";
 import {
   BrowserRouter, Routes, Route, Navigate, useLocation,
 } from "react-router-dom";
 import ErrorBoundary from "../ErrorBoundary";
-import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
+import { ChatProvider } from "@/context/ChatContext";
 import ChatBot from "../components/ChatBot";
 import CommandPalette from "@/components/CommandPalette";
 
@@ -12,7 +13,6 @@ import Signup from "../pages/Auth/Signup";
 import ResetPassword from "../pages/Auth/ResetPassword";
 import AdminLogin from "../pages/Auth/AdminLogin";
 import Landing from "../pages/Landing/LandingPage";
-import LoginGateway from "../pages/Landing/LoginGateway copy";
 import DashboardLayout from "../components/layout/DashboardLayout";
 
 import Dashboard from "../pages/Dashboard/Dashboard";
@@ -57,7 +57,6 @@ import URLSearch from "../components/Tools/SocialUrl/SocialUrlSearch";
 import Settings1 from "../components/Tools/Settings1/Settings1";
 import Notifications from "../components/Tools/Notifications/Notification";
 
-import AnalyticsDashboardPage from "../pages/Dashboard/Dashboard";
 import InsightDashboard from "../modules/InsightDashboard/Insight";
 import {
   OrganizationsList, AddOrganization, EditOrganization, OrganizationDetails,
@@ -72,9 +71,9 @@ const ScrollToTop = () => {
 };
 
 const App = () => (
-  <AuthProvider>
-    <BrowserRouter>
-      <ScrollToTop />
+    <ChatProvider>
+      <BrowserRouter>
+        <ScrollToTop />
       <Routes>
         <Route path="/" element={<ErrorBoundary><RootRedirect /></ErrorBoundary>} />
         <Route path="/login-gateway" element={<Navigate to="/login" replace />} />
@@ -92,8 +91,7 @@ const App = () => (
           <Route path="/insights/trend-analysis" element={<InsightDashboard />} />
           <Route path="/insights/feedback" element={<InsightDashboard />} />
 
-          {/* Legacy analytics routes - redirect to new dashboard */}
-          <Route path="/analytics" element={<Navigate to="/dashboard" replace />} />
+          {/* Legacy analytics dashboard route */}
           <Route path="/analytics/dashboard" element={<Navigate to="/dashboard" replace />} />
 
           {/* CRM */}
@@ -171,7 +169,7 @@ const App = () => (
       <ChatBot />
       <CommandPalette />
     </BrowserRouter>
-  </AuthProvider>
+    </ChatProvider>
 );
 
 const RequireAuth = ({ children }) => {

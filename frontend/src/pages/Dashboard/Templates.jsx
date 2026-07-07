@@ -34,7 +34,7 @@ const Templates = () => {
     try { await templateService.remove(id); load(); }
     catch (e) { toast.error(e.message); }
   };
-  const useTemplate = async (t) => {
+  const renderTemplate = async (t) => {
     try {
       const r = await templateService.use(t.id, test.vars);
       setTest({ id: t.id, vars: test.vars, output: r });
@@ -62,7 +62,7 @@ const Templates = () => {
                     <p className={`text-xs ${s.muted}`}>{t.category || "general"} · used {t.useCount || 0} times</p>
                   </div>
                   <div className="flex items-center gap-1">
-                    {isMember && <UptoButton variant="ghost" onClick={() => useTemplate(t)}><Play className="h-4 w-4" /></UptoButton>}
+                    {isMember && <UptoButton variant="ghost" onClick={() => renderTemplate(t)}><Play className="h-4 w-4" /></UptoButton>}
                     {isMember && <UptoButton variant="ghost" onClick={() => remove(t.id)} className="text-red-500"><Trash2 className="h-4 w-4" /></UptoButton>}
                   </div>
                 </div>

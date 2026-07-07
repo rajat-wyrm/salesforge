@@ -226,24 +226,47 @@ const kanbanView = asyncHandler(async (req, res) => {
 
 const metrics = asyncHandler(async (req, res) => {
   const orgId = req.orgId;
-  const [total, won, lost, open, sumAmount, wonAmount, lostAmount] = await Promise.all([
+  const [total, won, lost, openDeals, wonAmount, lostAmount] = await Promise.all([
     prisma.deal.count({ where: { orgId } }),
     prisma.deal.count({ where: { orgId, status: "COMPLETED" } }),
     prisma.deal.count({ where: { orgId, status: "INACTIVE" } }),
-    prisma.deal.count({ where: { orgId, status: "ACTIVE" } }),
-    prisma.deal.aggregate({ where: { orgId, status: "ACTIVE" }, _sum: { amount: true } }),
+    prisma.deal.findMany({
+      where: { orgId, status: "ACTIVE" },
+      select: { amount: true, probability: true },
+    }),
     prisma.deal.aggregate({ where: { orgId, status: "COMPLETED" }, _sum: { amount: true } }),
     prisma.deal.aggregate({ where: { orgId, status: "INACTIVE" }, _sum: { amount: true } }),
   ]);
+
+  const summarize = (deals) => deals.reduce(
+    (acc, deal) => ({
+      count: acc.count + 1,
+      amount: acc.amount + (Number(deal.amount) || 0),
+    }),
+    { count: 0, amount: 0 },
+  );
+
+  const open = summarize(openDeals);
+  const commit = summarize(openDeals.filter((deal) => Number(deal.probability) >= 75));
+  const bestCase = summarize(openDeals.filter((deal) => Number(deal.probability) >= 50));
+  const weightedPipeline = openDeals.reduce((sum, deal) => {
+    const probability = Math.max(0, Math.min(100, Number(deal.probability) || 0));
+    return sum + ((Number(deal.amount) || 0) * probability) / 100;
+  }, 0);
+
   const wonRate = total > 0 ? Math.round((won / total) * 100) : 0;
-  const weightedPipeline = (sumAmount._sum.amount || 0) * 0.5; // rough weighted estimate
   return response.success(res, {
-    total, won, lost, open,
-    pipelineValue: sumAmount._sum.amount || 0,
+    total,
+    won,
+    lost,
+    open,
+    commit,
+    bestCase,
+    pipelineValue: open.amount,
     wonValue: wonAmount._sum.amount || 0,
     lostValue: lostAmount._sum.amount || 0,
     wonRate,
-    weightedPipeline,
+    weightedPipeline: Math.round(weightedPipeline),
   });
 });
 

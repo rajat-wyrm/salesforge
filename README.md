@@ -21,6 +21,18 @@ A complete B2B SaaS platform for sales teams — CRM, deal pipelines, activities
 - PostgreSQL 14+
 - Docker (recommended for the database)
 
+### Run from the project root
+Use `npm.cmd` in PowerShell if your execution policy blocks `npm.ps1`.
+
+```bash
+npm.cmd run install:all
+npm.cmd run prisma:generate
+npm.cmd run dev:backend
+npm.cmd run dev:frontend
+```
+
+Run backend and frontend in two terminals. Backend runs on `http://localhost:3000`; frontend runs on `http://localhost:5173`.
+
 ### 1. Database (Docker)
 ```bash
 docker run -d --name salesforge-pg \

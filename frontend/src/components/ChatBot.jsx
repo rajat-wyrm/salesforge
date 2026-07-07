@@ -1,70 +1,51 @@
 import { useState, useRef, useEffect } from "react";
-import { X, Send } from "lucide-react";
+import { X, Send, Trash2 } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
+import { useAuth } from "../context/AuthContext";
+import { useChat } from "../context/ChatContext";
+import api from "../lib/api";
 
 export default function ChatBot() {
     const location = useLocation();
+    const { user } = useAuth();
+    const { messages, setMessages, isOpen, setIsOpen, clearChat } = useChat();
     const { theme } = useTheme();
     const darkMode = theme === "dark";
-    const [isOpen, setIsOpen] = useState(false);
-    const [messages, setMessages] = useState([]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
     const messagesEndRef = useRef(null);
 
     // 1. VISIBILITY CHECK (Blocklist approach)
-    // Hide Chatbot ONLY on login/register pages
     const hiddenPathnames = ['/login', '/signup', '/register', '/admin-login'];
     const isHidden = hiddenPathnames.includes(location.pathname);
 
-    // 2. CONTEXT LOGIC - Compute BEFORE hooks that depend on it
-    // Determine context based on current route
+    // 2. CONTEXT LOGIC
     const getContext = () => {
         if (location.pathname === '/') return 'landing';
         if (location.pathname.includes('my-dashboard') || location.pathname.includes('user-dashboard')) return 'user';
         return 'global';
     };
     const context = getContext();
-    const isUserContext = context === 'user';
-    const isLandingContext = context === 'landing';
 
     // Scroll Logic
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
-    // 3. ALL HOOKS MUST BE CALLED UNCONDITIONALLY (before any early returns)
+    // 3. ALL HOOKS CALLED UNCONDITIONALLY
     useEffect(() => {
         if (!isHidden) {
             scrollToBottom();
         }
     }, [messages, isOpen, isHidden]);
 
-    // 4. AUTO-RESET / WELCOME MESSAGE
-    useEffect(() => {
-        // Skip if hidden
-        if (isHidden) return;
-
-        let welcomeMsg = "Hello! I can provide insights on Global System stats.";
-
-        if (isLandingContext) {
-            welcomeMsg = "Hi, I'm your Fintech assistant. What do you want to do right now: find new leads or manage existing ones?";
-        } else if (isUserContext) {
-            welcomeMsg = "Hello! Ask me about your personal logins and activity.";
-        } else if (location.pathname.includes('admin')) {
-            welcomeMsg = "Hello Admin! Ask me about system-wide performance and metrics.";
-        }
-
-        setMessages([{ text: welcomeMsg, sender: "bot" }]);
-    }, [location.pathname, isUserContext, isLandingContext, isHidden]);
-
-    // 5. EARLY RETURN - AFTER all hooks are called
+    // 4. EARLY RETURN - AFTER all hooks
     if (isHidden) {
         return null;
     }
 
-    // 4. SEND MESSAGE LOGIC
+    // 5. SEND MESSAGE LOGIC
     const handleSend = async () => {
         if (!input.trim()) return;
 
@@ -74,23 +55,21 @@ export default function ChatBot() {
         setLoading(true);
 
         try {
-            // Retrieve User ID to send context
-            const userId = localStorage.getItem("userId");
+            const userId = user ? String(user.id) : null;
+            const history = messages.map((m) => ({ text: m.text, sender: m.sender }));
+            const requestPayload = {
+                message: userMessage,
+                history,
+                context,
+                userId
+            };
 
-            const response = await fetch("http://localhost:3000/api/chat", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    message: userMessage,
-                    context: context,
-                    userId: userId // Pass dynamic ID
-                }),
-            });
+            const response = await api.post("/ai/chat", requestPayload);
 
-            const data = await response.json();
-            setMessages((prev) => [...prev, { text: data.reply, sender: "bot" }]);
+            const botReply = response.data?.data?.reply || response.data?.reply || "I received a response, but it was empty.";
+
+            setMessages((prev) => [...prev, { text: botReply, sender: "bot" }]);
         } catch (error) {
-            console.error("Chat error:", error);
             setMessages((prev) => [
                 ...prev,
                 { text: "Sorry, I can't reach the server right now.", sender: "bot" },
@@ -108,13 +87,24 @@ export default function ChatBot() {
 
                     {/* Header */}
                     <div className="bg-[#2DD4BF] h-32 relative flex justify-center items-center">
-                        <button
-                            onClick={() => setIsOpen(false)}
-                            className="absolute top-4 right-4 text-white hover:bg-white/20 p-1 rounded transition-colors"
-                            aria-label="Close"
-                        >
-                            <X className="w-6 h-6" />
-                        </button>
+                        <div className="absolute top-4 right-4 flex gap-1">
+                            <button
+                                onClick={clearChat}
+                                className="text-white hover:bg-white/20 p-1 rounded transition-colors"
+                                aria-label="New Chat"
+                                title="New Chat"
+                            >
+                                <Trash2 className="w-5 h-5" />
+                            </button>
+                            <button
+                                onClick={() => setIsOpen(false)}
+                                className="text-white hover:bg-white/20 p-1 rounded transition-colors"
+                                aria-label="Close"
+                                title="Close"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
 
                         {/* Logo Container (White Oval) */}
                         <div className="bg-white px-6 py-2 rounded-full shadow-sm">

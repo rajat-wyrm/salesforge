@@ -57,12 +57,27 @@ api.interceptors.response.use(
   (error) => {
     const status = error.response?.status;
     const data = error.response?.data || {};
-    if (status === 401 && !error.config?.url?.includes("/auth/")) {
+    const requestUrl = error.config?.url || "";
+    const isAuthRequest = requestUrl.includes("/auth/");
+
+    if (status === 401 && !isAuthRequest) {
       tokenStore.clear();
-      if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+
+      if (data.code === "JWT_EXPIRED") {
+        sessionStorage.setItem(
+          "salesforge.authMessage",
+          "Your session expired. Please log in again.",
+        );
+      }
+
+      if (
+        typeof window !== "undefined" &&
+        !window.location.pathname.startsWith("/login")
+      ) {
         window.location.href = "/login";
       }
     }
+
     const normalized = {
       status,
       message: data.message || error.message || "Request failed",
@@ -70,6 +85,7 @@ api.interceptors.response.use(
       details: data.details,
       requestId: error.response?.headers?.["x-request-id"],
     };
+
     return Promise.reject(normalized);
   },
 );
@@ -112,7 +128,7 @@ export const openEventStream = (path, { onEvent, onError, params = {} } = {}) =>
   };
   // eventSource supports addEventListener per event name
   ["ready", "message", "LEAD_CREATED", "LEAD_UPDATED", "LEAD_DELETED", "LEAD_STATUS_CHANGED",
-   "DEAL_CREATED", "DEAL_UPDATED", "USER_INVITED", "USER_JOINED", "PAYMENT_SUCCEEDED",
+   "DEAL_CREATED", "DEAL_UPDATED", "DEAL_STAGE_CHANGED", "USER_INVITED", "USER_JOINED", "PAYMENT_SUCCEEDED",
    "PAYMENT_FAILED", "SUBSCRIPTION_UPDATED", "SEARCH_COMPLETED", "INTEGRATION_SYNCED",
    "notifications.read_all", "notification.new"].forEach((evt) => {
     source.addEventListener(evt, (e) => {

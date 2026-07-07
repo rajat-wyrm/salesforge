@@ -128,30 +128,38 @@ const scoreAll = asyncHandler(async (req, res) => {
 });
 
 const insights = asyncHandler(async (req, res) => {
-  const leads = await prisma.lead.findMany({ where: { orgId: req.orgId } });
+  const orgId = req.orgId;
+  const leads = await prisma.lead.findMany({ where: { orgId } });
+  
   const hot = leads.filter((l) => l.score >= 80);
-  const warm = leads.filter((l) => l.score >= 60 && l.score < 80);
-  const cold = leads.filter((l) => l.score < 40);
-  const insights = [
-    {
-      type: hot.length > 0 ? "opportunity" : "info",
-      title: `${hot.length} hot leads ready for outreach`,
-      body: `You have ${hot.length} leads with a score of 80 or higher. These are your best opportunities.`,
-    },
-    {
-      type: warm.length > 5 ? "opportunity" : "info",
-      title: `${warm.length} warm leads to nurture`,
-      body: `Consider adding ${warm.length} warm leads to a nurture campaign to move them toward a sale.`,
-    },
-    {
-      type: cold.length > leads.length * 0.5 ? "warning" : "info",
-      title: `${cold.length} cold leads need attention`,
-      body: cold.length > leads.length * 0.5
-        ? `Over 50% of your leads are cold. Consider data enrichment and re-engagement campaigns.`
-        : `Your lead quality is good. Focus on converting warm leads.`,
-    },
+  const warm = leads.filter((l) => l.score >= 40 && l.score < 80);
+  const scoredCount = leads.filter((l) => l.score > 0).length;
+
+  const summary = scoredCount > 0 
+    ? `Analyzed ${scoredCount} scored leads. Your pipeline has ${hot.length} high-priority hot leads and ${warm.length} warm leads.`
+    : "No lead scoring data available. Run scoring to analyze your pipeline.";
+
+  const factors = [
+    { factor: "Engagement Activities", weight: 0.20 },
+    { factor: "Profile Completeness", weight: 0.20 },
+    { factor: "Job Seniority Fit", weight: 0.15 },
+    { factor: "Company Scale Fit", weight: 0.15 },
+    { factor: "Target Industry Fit", weight: 0.10 },
+    { factor: "Lead Source Quality", weight: 0.10 }
   ];
-  return response.success(res, { insights, stats: { hot: hot.length, warm: warm.length, cold: cold.length, total: leads.length } });
+
+  const topLeads = await prisma.lead.findMany({
+    where: { orgId, score: { gt: 0 } },
+    orderBy: { score: "desc" },
+    take: 5,
+    select: { id: true, name: true, score: true }
+  });
+
+  return response.success(res, {
+    summary,
+    factors,
+    topLeads
+  });
 });
 
 module.exports = { scoreOne, scoreBatch, scoreAll, insights, scoreLead };

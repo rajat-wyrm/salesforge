@@ -57,7 +57,7 @@ const Workflows = () => {
     try { await workflowService.remove(id); load(); }
     catch (e) { toast.error(e.message); }
   };
-  const useTemplate = (t) => {
+  const applyTemplate = (t) => {
     setDraft({ name: t.name, description: t.description || "", trigger: t.trigger, actions: t.actions });
     setShowCreate(true);
   };
@@ -74,7 +74,7 @@ const Workflows = () => {
           <UptoCard>
             <div className="flex flex-wrap gap-2">
               {templates.map((t, i) => (
-                <button key={i} onClick={() => useTemplate(t)} className={`rounded-xl border px-3 py-1.5 text-xs transition ${darkMode ? "border-slate-700 hover:border-[#00b5ad] hover:bg-teal-900/20" : "border-slate-200 hover:border-[#00b5ad] hover:bg-teal-50"}`}>
+                <button key={i} onClick={() => applyTemplate(t)} className={`rounded-xl border px-3 py-1.5 text-xs transition ${darkMode ? "border-slate-700 hover:border-[#00b5ad] hover:bg-teal-900/20" : "border-slate-200 hover:border-[#00b5ad] hover:bg-teal-50"}`}>
                   {t.name}
                 </button>
               ))}
