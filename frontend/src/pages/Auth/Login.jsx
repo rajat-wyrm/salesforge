@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { GoogleLogin } from "@react-oauth/google";
+import axios from "axios";
 import { useAuth } from "@/context/AuthContext";
+import { tokenStore } from "../../lib/api";
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login, isAuthenticated, loading } = useAuth();
+  const { login, isAuthenticated, loading, refresh } = useAuth();
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
@@ -30,6 +33,34 @@ const Login = () => {
       setSubmitting(false);
     }
   };
+const handleGoogleSuccess = async (credentialResponse) => {
+  console.log("Google Success");
+  console.log(credentialResponse);
+
+  try {
+    console.log("Sending request...");
+
+    const res = await axios.post(
+      "http://localhost:3000/api/auth/google",
+      {
+        credential: credentialResponse.credential,
+      }
+    );
+
+    console.log("Backend response:", res.data);
+
+    tokenStore.set(res.data.data.token);
+
+    await refresh();
+
+    navigate("/dashboard", { replace: true });
+  } catch (err) {
+    console.log("Axios Error:", err);
+    console.log(err.response);
+
+    setError("Google Sign-In failed.");
+  }
+};
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-gray-50 transition-colors duration-300 dark:bg-gray-950">
@@ -113,6 +144,19 @@ const Login = () => {
               {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
               {submitting ? "Signing in..." : "Sign in"}
             </button>
+            <div className="my-4 flex items-center">
+  <div className="h-px flex-1 bg-gray-300 dark:bg-gray-700"></div>
+  <span className="px-3 text-xs text-gray-500">OR</span>
+  <div className="h-px flex-1 bg-gray-300 dark:bg-gray-700"></div>
+</div>
+
+<div className="flex justify-center">
+  <GoogleLogin
+    onSuccess={handleGoogleSuccess}
+    onError={() => setError("Google Sign-In failed")}
+  />
+</div>
+            
           </form>
 
           <div className="mt-6 text-center text-xs text-gray-500 dark:text-gray-400">
