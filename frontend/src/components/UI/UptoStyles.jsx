@@ -55,7 +55,7 @@ export const SectionHeading = ({ label, darkMode }) => (
     <h2 className={`text-xl font-semibold mb-2 ${darkMode ? "text-white" : "text-slate-900"}`}>
       {label}
     </h2>
-    <div className="w-10 h-[3px] bg-gradient-to-r from-[#00b5ad] to-[#e76937] rounded-full" />
+    <div className="w-10 h-[3px] bg-linear-to-r from-[#00b5ad] to-[#e76937] rounded-full" />
   </div>
 );
 
@@ -148,7 +148,7 @@ export const UptoToolCard = ({ title, description, path, buttonText, icon: Icon,
   return (
     <div
       onClick={onClick || (() => {})}
-      className={`group relative bg-gradient-to-br ${palette.gradient} border ${palette.border} rounded-2xl p-7 cursor-pointer overflow-hidden transition-transform duration-200 hover:scale-[1.015]`}
+      className={`group relative bg-linear-to-br ${palette.gradient} border ${palette.border} rounded-2xl p-7 cursor-pointer overflow-hidden transition-transform duration-200 hover:scale-[1.015]`}
     >
       <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
       <div className="relative">

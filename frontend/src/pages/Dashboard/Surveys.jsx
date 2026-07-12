@@ -30,7 +30,12 @@ const Surveys = () => {
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
-      await surveyService.create(draft);
+      const payload = {
+        name: draft.title,
+        type: draft.type,
+        questions: draft.question ? [draft.question] : [],
+      };
+      await surveyService.create(payload);
       toast.success("Survey created");
       setShowCreate(false);
       setDraft({ title: "", type: "NPS", question: "" });
