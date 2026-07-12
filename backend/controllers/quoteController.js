@@ -6,10 +6,25 @@ const { recordAudit } = require("../services/auditService");
 
 const VALID_STATUSES = ["DRAFT", "SENT", "VIEWED", "ACCEPTED", "REJECTED", "EXPIRED", "REVISED"];
 
+// Generate a unique quote number. Uses findMany + sort to find the highest
+// existing number for this org/year, then increments. Falls back to a
+// timestamp-based suffix if a collision still occurs.
 const generateNumber = async (orgId) => {
-  const count = await prisma.quote.count({ where: { orgId } });
   const year = new Date().getFullYear();
-  return `Q-${year}-${String(count + 1).padStart(4, "0")}`;
+  const prefix = `Q-${year}-`;
+  // Find the highest existing quote number for this year
+  const latest = await prisma.quote.findFirst({
+    where: { orgId, number: { startsWith: prefix } },
+    orderBy: { number: "desc" },
+    select: { number: true },
+  });
+  let next = 1;
+  if (latest) {
+    const parts = latest.number.split("-");
+    const last = parseInt(parts[parts.length - 1], 10);
+    if (!isNaN(last)) next = last + 1;
+  }
+  return `${prefix}${String(next).padStart(4, "0")}`;
 };
 
 const recalcTotals = (quote, items) => {
@@ -55,7 +70,6 @@ const create = asyncHandler(async (req, res) => {
   const { title, description, dealId, items = [], tax = 0, discount = 0, currency = "USD", validUntil, notes, terms } = req.body;
   if (!title) throw new AppError("title is required.", 400);
 
-  const number = await generateNumber(req.orgId);
   const processedItems = items.map((item, idx) => ({
     name: item.name,
     description: item.description || null,
@@ -70,27 +84,43 @@ const create = asyncHandler(async (req, res) => {
   const subtotal = processedItems.reduce((s, i) => s + i.total, 0);
   const total = Math.round((subtotal + Number(tax) - Number(discount)) * 100) / 100;
 
-  const quote = await prisma.quote.create({
-    data: {
-      orgId: req.orgId,
-      dealId: dealId ? Number(dealId) : null,
-      number, title,
-      description: description || null,
-      subtotal: Math.round(subtotal * 100) / 100,
-      tax: Number(tax) || 0,
-      discount: Number(discount) || 0,
-      total,
-      currency,
-      validUntil: validUntil ? new Date(validUntil) : null,
-      notes: notes || null,
-      terms: terms || null,
-      status: "DRAFT",
-      createdById: req.user.id,
-      items: { create: processedItems },
-    },
-    include: { items: true },
-  });
-  await recordAudit({ userId: req.user.id, orgId: req.orgId, action: "quote.create", entityType: "Quote", entityId: quote.id, metadata: { number, total } });
+  // Retry logic to handle rare race-condition collisions on the unique number
+  let quote;
+  let attempts = 0;
+  while (!quote && attempts < 5) {
+    attempts++;
+    const number = attempts === 1
+      ? await generateNumber(req.orgId)
+      : `Q-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase()}`;
+    try {
+      quote = await prisma.quote.create({
+        data: {
+          orgId: req.orgId,
+          dealId: dealId ? Number(dealId) : null,
+          number, title,
+          description: description || null,
+          subtotal: Math.round(subtotal * 100) / 100,
+          tax: Number(tax) || 0,
+          discount: Number(discount) || 0,
+          total,
+          currency,
+          validUntil: validUntil ? new Date(validUntil) : null,
+          notes: notes || null,
+          terms: terms || null,
+          status: "DRAFT",
+          createdById: req.user.id,
+          items: { create: processedItems },
+        },
+        include: { items: true },
+      });
+    } catch (err) {
+      // P2002 = Unique constraint violation on the 'number' field
+      if (err.code === "P2002" && attempts < 5) continue;
+      throw err;
+    }
+  }
+
+  await recordAudit({ userId: req.user.id, orgId: req.orgId, action: "quote.create", entityType: "Quote", entityId: quote.id, metadata: { number: quote.number, total } });
   return response.created(res, quote);
 });
 
@@ -102,6 +132,8 @@ const update = asyncHandler(async (req, res) => {
     if (req.body[k] !== undefined) data[k] = req.body[k];
   });
   if (data.validUntil) data.validUntil = new Date(data.validUntil);
+  if (data.tax !== undefined) data.tax = Number(data.tax) || 0;
+  if (data.discount !== undefined) data.discount = Number(data.discount) || 0;
   if (req.body.items) {
     await prisma.quoteItem.deleteMany({ where: { quoteId: quote.id } });
     const processedItems = req.body.items.map((item, idx) => ({
@@ -118,7 +150,8 @@ const update = asyncHandler(async (req, res) => {
     await prisma.quoteItem.createMany({ data: processedItems });
   }
   const items = await prisma.quoteItem.findMany({ where: { quoteId: quote.id } });
-  const totals = recalcTotals(quote, items);
+  const mergedQuote = { ...quote, ...data };
+  const totals = recalcTotals(mergedQuote, items);
   data.subtotal = totals.subtotal;
   data.total = totals.total;
   const updated = await prisma.quote.update({ where: { id: quote.id }, data, include: { items: true } });

@@ -5,9 +5,9 @@ const asyncHandler = require("../utils/asyncHandler");
 const response = require("../utils/response");
 const { recordAudit } = require("../services/auditService");
 
-// Documents are stored using the existing infrastructure.
+// Documents are stored using the existing Webhook model.
 // File content is stored on disk (in a configurable path) and metadata in DB.
-// This is a production-ready pattern used by companies like Dropbox and Slack.
+// All document queries include a url filter to isolate them from real webhooks.
 
 const crypto = require("crypto");
 const path = require("path");
@@ -36,10 +36,14 @@ const ALLOWED_TYPES = {
 
 const MAX_SIZE = 50 * 1024 * 1024; // 50MB
 
+// Base filter to separate document records from real webhook records
+const docFilter = (orgId) => ({ orgId, url: { startsWith: "/api/documents" } });
+
 const list = asyncHandler(async (req, res) => {
   const { page = 1, limit = 50, search, category } = req.query;
-  const where = { orgId: req.orgId };
-  if (category) where.category = category;
+  const where = docFilter(req.orgId);
+  // Webhook model stores category in the 'events' field
+  if (category) where.events = category;
   if (search) where.name = { contains: search, mode: "insensitive" };
   const skip = (Number(page) - 1) * Number(limit);
   const [items, total] = await Promise.all([
@@ -50,15 +54,20 @@ const list = asyncHandler(async (req, res) => {
 });
 
 const get = asyncHandler(async (req, res) => {
-  const doc = await prisma.webhook.findFirst({ where: { id: Number(req.params.id), orgId: req.orgId } });
+  const doc = await prisma.webhook.findFirst({ where: { id: Number(req.params.id), ...docFilter(req.orgId) } });
   if (!doc) throw new AppError("Document not found.", 404);
   return response.success(res, doc);
 });
 
 const upload = asyncHandler(async (req, res) => {
-  if (!req.body?.name || !req.body?.content) throw new AppError("name and content (base64) are required.", 400);
-  const { name, content, contentType = "application/octet-stream", category, description, isPublic = false, tags } = req.body;
-  const buffer = Buffer.from(content, "base64");
+  // Supports multipart/form-data file uploads from the frontend
+  const file = req.file;
+  if (!file) throw new AppError("file is required.", 400);
+  const name = file.originalname;
+  const buffer = file.buffer;
+  const contentType = file.mimetype;
+  const category = req.body.category || "document";
+
   if (buffer.length > MAX_SIZE) throw new AppError(`File too large. Max size: ${MAX_SIZE / 1024 / 1024}MB`, 413);
   const hash = crypto.createHash("sha256").update(buffer).digest("hex");
   const ext = ALLOWED_TYPES[contentType] || "";
@@ -72,7 +81,7 @@ const upload = asyncHandler(async (req, res) => {
       name,
       url: `/api/documents/${hash}/download`,
       secret: filename,
-      events: category || "document",
+      events: category,
       active: true,
     },
   });
@@ -86,25 +95,28 @@ const upload = asyncHandler(async (req, res) => {
 });
 
 const download = asyncHandler(async (req, res) => {
-  const filepath = path.join(UPLOAD_DIR, req.params.hash);
-  if (!fs.existsSync(filepath)) throw new AppError("File not found.", 404);
-  res.download(filepath);
+  // Frontend calls GET /documents/:id/download — look up by database ID
+  const doc = await prisma.webhook.findFirst({ where: { id: Number(req.params.id), ...docFilter(req.orgId) } });
+  if (!doc) throw new AppError("Document not found.", 404);
+  const filepath = path.join(UPLOAD_DIR, doc.secret);
+  if (!fs.existsSync(filepath)) throw new AppError("File not found on disk.", 404);
+  res.download(filepath, doc.name);
 });
 
 const update = asyncHandler(async (req, res) => {
-  const { name, description, category, isPublic, tags } = req.body;
+  const { name, category, isPublic } = req.body;
   const data = {};
   if (name !== undefined) data.name = name;
-  if (description !== undefined) data.description = description;
+  // Webhook model uses 'events' for category, not a 'description' field
   if (category !== undefined) data.events = category;
   if (isPublic !== undefined) data.active = isPublic;
-  const result = await prisma.webhook.updateMany({ where: { id: Number(req.params.id), orgId: req.orgId }, data });
+  const result = await prisma.webhook.updateMany({ where: { id: Number(req.params.id), ...docFilter(req.orgId) }, data });
   if (result.count === 0) throw new AppError("Document not found.", 404);
   return response.success(res, { message: "Document updated." });
 });
 
 const remove = asyncHandler(async (req, res) => {
-  const doc = await prisma.webhook.findFirst({ where: { id: Number(req.params.id), orgId: req.orgId } });
+  const doc = await prisma.webhook.findFirst({ where: { id: Number(req.params.id), ...docFilter(req.orgId) } });
   if (!doc) throw new AppError("Document not found.", 404);
   // Don't delete the file on disk (might be referenced elsewhere)
   await prisma.webhook.delete({ where: { id: doc.id } });
@@ -113,7 +125,7 @@ const remove = asyncHandler(async (req, res) => {
 
 const metrics = asyncHandler(async (req, res) => {
   const docs = await prisma.webhook.findMany({
-    where: { orgId: req.orgId },
+    where: docFilter(req.orgId),
     select: { id: true, name: true, createdAt: true, events: true },
   });
   const totalSize = docs.length;

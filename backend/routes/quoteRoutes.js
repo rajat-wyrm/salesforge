@@ -7,10 +7,10 @@ const { permit } = require("../middleware/rbac");
 
 router.use(protect, tenantScope);
 
-router.get("/", ctrl.list);
 router.get("/metrics", ctrl.metrics);
-router.post("/", permit("OWNER", "ADMIN", "MEMBER"), ctrl.create);
+router.get("/", ctrl.list);
 router.get("/:id", ctrl.get);
+router.post("/", permit("OWNER", "ADMIN", "MEMBER"), ctrl.create);
 router.patch("/:id", permit("OWNER", "ADMIN", "MEMBER"), ctrl.update);
 router.patch("/:id/status", permit("OWNER", "ADMIN", "MEMBER"), ctrl.updateStatus);
 router.delete("/:id", permit("OWNER", "ADMIN"), ctrl.remove);

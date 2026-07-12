@@ -32,6 +32,7 @@
     "joi": "^18.0.2",
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.11.0",
+    "multer": "^2.2.0",
     "node-cron": "^4.2.1",
     "nodemailer": "^9.0.3",
     "response-time": "^2.3.4",

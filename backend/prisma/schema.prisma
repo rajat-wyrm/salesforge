@@ -47,9 +47,6 @@ model User {
   name           String
   email          String        @unique
   password       String
-  googleId       String?       @unique
-  avatar         String?
-  provider       String        @default("local")
   role           UserRole      @default(MEMBER)
   organizationId Int?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
@@ -61,7 +58,6 @@ model User {
   emailVerificationToken   String?
   emailVerificationExpires DateTime?
   emailOtpLastSentAt       DateTime?
-  emailOtpFailedAttempts Int @default(0)
   isVerified               Boolean   @default(false)
 
   mobile                    String?   @unique

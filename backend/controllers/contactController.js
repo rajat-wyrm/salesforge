@@ -21,7 +21,6 @@ const toContact = (org) => ({
 const list = asyncHandler(async (req, res) => {
     const { page = 1, limit = 50, search, sortBy = "createdAt", order = "desc" } = req.query;
 
-    // FIX: Using 'id' because that's the Primary Key in your Organization table
     const where = { id: req.orgId };
 
     if (search) {
@@ -39,7 +38,6 @@ const list = asyncHandler(async (req, res) => {
 
     const skip = (Number(page) - 1) * Number(limit);
 
-    // prisma.findMany will now return only the Organization matching the user's orgId
     const [orgs, total] = await Promise.all([
         prisma.organization.findMany({
             where,
@@ -55,7 +53,6 @@ const list = asyncHandler(async (req, res) => {
 });
 
 const get = asyncHandler(async (req, res) => {
-    // Only fetch the org if it matches the authenticated user's orgId
     const org = await prisma.organization.findFirst({
         where: { id: req.orgId }, 
     });
@@ -73,7 +70,6 @@ const create = asyncHandler(async (req, res) => {
 
     if (!firstName && !lastName) throw new AppError("firstName or lastName is required.", 400);
     
-    // Create is now restricted to the user's specific organization ID
     const org = await prisma.organization.findUnique({ where: { id: req.orgId } });
     if (!org) throw new AppError("Organization context missing.", 404);
 
@@ -87,7 +83,7 @@ const create = asyncHandler(async (req, res) => {
         },
     });
 
-    // Lead upsert logic remains the same
+    // Lead upsert — use "other" which is a valid LeadSource enum value
     if (email) {
         try {
             await prisma.lead.upsert({
@@ -100,7 +96,7 @@ const create = asyncHandler(async (req, res) => {
                     companyName: org.name,
                     jobTitle: jobTitle || null,
                     status: "new",
-                    source: "contact",
+                    source: "other",
                     addedById: req.user.id,
                 },
                 update: {
@@ -129,10 +125,15 @@ const create = asyncHandler(async (req, res) => {
 const update = asyncHandler(async (req, res) => {
     const { firstName, lastName, email } = req.body;
 
+    // Use explicit undefined checks so empty strings are intentional updates
+    const newName = (firstName !== undefined || lastName !== undefined)
+        ? `${firstName || ""} ${lastName || ""}`.trim()
+        : undefined;
+
     const org = await prisma.organization.update({
         where: { id: req.orgId },
         data: {
-            contactName: firstName || lastName ? `${firstName || ""} ${lastName || ""}`.trim() : undefined,
+            contactName: newName,
             contactEmail: email !== undefined ? email : undefined,
         },
     });
