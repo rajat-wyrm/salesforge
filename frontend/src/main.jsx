@@ -1,9 +1,10 @@
 import React, { Suspense } from "react";
 import ReactDOM from "react-dom/client";
+import { GoogleOAuthProvider } from "@react-oauth/google";
 import App from "./App.jsx";
 import "./styles/global.css";
 import { initializeTheme } from "./context/ThemeContext";
-import reportWebVitals from '../reportWebVitals.js';
+import reportWebVitals from "../reportWebVitals.js";
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -14,14 +15,17 @@ const LoadingFallback = () => (
     </div>
   </div>
 );
+//console.log(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
 initializeTheme();
-
+console.log("Google Client ID:", import.meta.env.VITE_GOOGLE_CLIENT_ID);
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <Suspense fallback={<LoadingFallback />}>
-      <App />
-    </Suspense>
+    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+      <Suspense fallback={<LoadingFallback />}>
+        <App />
+      </Suspense>
+    </GoogleOAuthProvider>
   </React.StrictMode>
 );
 

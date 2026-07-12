@@ -12,6 +12,7 @@ const extractToken = (req) => {
 
 const protect = async (req, res, next) => {
   const token = extractToken(req);
+  console.log("Authorization:", req.headers.authorization);
   if (!token) {
     return res.status(401).json({ success: false, message: "Authentication required." });
   }

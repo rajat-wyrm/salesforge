@@ -83,7 +83,7 @@ const Quotas = () => {
           <form onSubmit={handleCreate} className="bg-white dark:bg-slate-900 rounded-2xl p-6 max-w-md w-full">
             <h3 className="text-lg font-semibold mb-4">New quota</h3>
             <div className="space-y-3">
-              <UptoInput label="User ID" value={draft.userId} onChange={(e) => setDraft({ ...draft, userId: e.target.value })} required />
+              <UptoInput label="User ID" placeholder="Leave blank for yourself" value={draft.userId} onChange={(e) => setDraft({ ...draft, userId: e.target.value })} />
               <UptoInput label="Target" type="number" value={draft.target} onChange={(e) => setDraft({ ...draft, target: e.target.value })} required />
               <UptoInput label="Type" value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value })} />
             </div>

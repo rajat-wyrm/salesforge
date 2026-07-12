@@ -8,6 +8,15 @@ const asyncHandler = require("../utils/asyncHandler");
 const response = require("../utils/response");
 const { recordAudit } = require("../services/auditService");
 
+// Safely parse customFields — Prisma may return a JSON string or object
+const parseCustomFields = (cf) => {
+  if (!cf) return {};
+  if (typeof cf === "string") {
+    try { return JSON.parse(cf); } catch { return {}; }
+  }
+  return cf;
+};
+
 const getCurrentPeriod = () => {
   const now = new Date();
   return `${now.getFullYear()}-Q${Math.ceil((now.getMonth() + 1) / 3)}`;
@@ -28,7 +37,7 @@ const list = asyncHandler(async (req, res) => {
     where, take: 50, select: { id: true, name: true, email: true, role: true, customFields: true },
   });
   const quotas = users.map((u) => {
-    const cf = u.customFields || {};
+    const cf = parseCustomFields(u.customFields);
     const q = cf.quotas?.[period] || { target: 0, actual: 0 };
     return {
       id: u.id,
@@ -47,7 +56,7 @@ const get = asyncHandler(async (req, res) => {
     where: { id: Number(req.params.id), organizationId: req.orgId },
   });
   if (!user) throw new AppError("User not found.", 404);
-  const cf = user.customFields || {};
+  const cf = parseCustomFields(user.customFields);
   const q = cf.quotas?.[req.query.period || getCurrentPeriod()] || { target: 0, actual: 0 };
   return response.success(res, {
     id: user.id,
@@ -60,14 +69,15 @@ const get = asyncHandler(async (req, res) => {
 });
 
 const create = asyncHandler(async (req, res) => {
-  const { userId, period = getCurrentPeriod(), target, type = "revenue", stretch, bonus } = req.body;
-  if (!userId) throw new AppError("userId is required.", 400);
+  const { period = getCurrentPeriod(), target, type = "revenue", stretch, bonus } = req.body;
+  // Default to the logged-in user's ID when userId is not provided or empty
+  const userId = req.body.userId ? Number(req.body.userId) : req.user.id;
   if (target === undefined) throw new AppError("target is required.", 400);
 
-  const user = await prisma.user.findFirst({ where: { id: Number(userId), organizationId: req.orgId } });
-  if (!user) throw new AppError("User not found.", 404);
+  const user = await prisma.user.findFirst({ where: { id: userId, organizationId: req.orgId } });
+  if (!user) throw new AppError("User not found in your organization.", 404);
 
-  const cf = user.customFields || {};
+  const cf = parseCustomFields(user.customFields);
   const quotas = cf.quotas || {};
   quotas[period] = { target: Number(target), actual: quotas[period]?.actual || 0, type, stretch, bonus };
 
@@ -84,7 +94,7 @@ const update = asyncHandler(async (req, res) => {
   const user = await prisma.user.findFirst({ where: { id: Number(req.params.id), organizationId: req.orgId } });
   if (!user) throw new AppError("User not found.", 404);
 
-  const cf = user.customFields || {};
+  const cf = parseCustomFields(user.customFields);
   const quotas = cf.quotas || {};
   quotas[period] = {
     target: target !== undefined ? Number(target) : quotas[period]?.target || 0,
@@ -103,7 +113,7 @@ const update = asyncHandler(async (req, res) => {
 const remove = asyncHandler(async (req, res) => {
   const user = await prisma.user.findFirst({ where: { id: Number(req.params.id), organizationId: req.orgId } });
   if (!user) throw new AppError("User not found.", 404);
-  const cf = user.customFields || {};
+  const cf = parseCustomFields(user.customFields);
   const quotas = cf.quotas || {};
   delete quotas[req.query.period || getCurrentPeriod()];
   await prisma.user.update({
@@ -123,7 +133,7 @@ const metrics = asyncHandler(async (req, res) => {
   let totalActual = 0;
   const breakdown = [];
   for (const u of users) {
-    const q = u.customFields?.quotas?.[period];
+    const q = parseCustomFields(u.customFields).quotas?.[period];
     if (q) {
       totalTarget += q.target || 0;
       totalActual += q.actual || 0;

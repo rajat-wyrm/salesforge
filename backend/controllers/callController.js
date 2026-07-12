@@ -48,22 +48,33 @@ const get = asyncHandler(async (req, res) => {
   return response.success(res, call);
 });
 
-const log = asyncHandler(async (req, res) => {
-  const { phone, direction = "outbound", outcome, duration = 0, leadId, dealId, contactId, notes, recordingUrl, transcript } = req.body;
-  if (!phone) throw new AppError("phone is required.", 400);
+// "create" handler — the frontend sends POST /calls with body fields.
+// Maps frontend field names to the Activity model.
+const create = asyncHandler(async (req, res) => {
+  const {
+    phone, phoneNumber,                          // frontend may send either
+    title, description, notes,
+    direction = "outbound", outcome, duration = 0,
+    leadId, dealId, contactId,
+    recordingUrl, transcript,
+  } = req.body;
+
+  // Accept either "phone" or "phoneNumber" from the frontend
+  const phoneVal = phone || phoneNumber;
+  if (!phoneVal && !title) throw new AppError("phone or title is required.", 400);
 
   const call = await prisma.activity.create({
     data: {
       orgId: req.orgId,
       userId: req.user.id,
       kind: "CALL",
-      status: outcome === "connected" ? "COMPLETED" : "COMPLETED",
+      status: "COMPLETED",
       entityType: leadId ? "LEAD" : dealId ? "DEAL" : "LEAD",
-      entityId: leadId || dealId || 1,
-      title: `${direction === "outbound" ? "Outbound" : "Inbound"} call to ${phone}`,
-      body: notes,
+      entityId: Number(leadId) || Number(dealId) || 1,
+      title: title || `${direction === "outbound" ? "Outbound" : "Inbound"} call to ${phoneVal}`,
+      description: description || notes || null,
       metadata: {
-        phone, direction, outcome, duration,
+        phone: phoneVal, direction, outcome, duration: Number(duration) || 0,
         leadId, dealId, contactId,
         recordingUrl, transcript,
         sentiment: null,
@@ -71,7 +82,7 @@ const log = asyncHandler(async (req, res) => {
     },
     include: { user: { select: { id: true, name: true, email: true } } },
   });
-  await recordAudit({ userId: req.user.id, orgId: req.orgId, action: "call.log", entityType: "Call", entityId: call.id, metadata: { phone, outcome } });
+  await recordAudit({ userId: req.user.id, orgId: req.orgId, action: "call.log", entityType: "Call", entityId: call.id, metadata: { phone: phoneVal, outcome } });
   return response.created(res, call);
 });
 
@@ -80,11 +91,14 @@ const update = asyncHandler(async (req, res) => {
     where: { id: Number(req.params.id), orgId: req.orgId, kind: "CALL" },
   });
   if (!call) throw new AppError("Call not found.", 404);
-  const { outcome, notes, duration, transcript, sentiment } = req.body;
+  const { outcome, notes, description, duration, transcript, sentiment, title } = req.body;
   const metadata = { ...(call.metadata || {}), outcome, duration, transcript, sentiment };
+  const data = { metadata, status: "COMPLETED" };
+  if (notes !== undefined || description !== undefined) data.description = notes || description;
+  if (title !== undefined) data.title = title;
   const updated = await prisma.activity.update({
     where: { id: call.id },
-    data: { body: notes, metadata, status: "COMPLETED" },
+    data,
   });
   return response.success(res, updated);
 });
@@ -122,4 +136,4 @@ const metrics = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { list, get, log, update, remove, metrics, CALL_OUTCOMES, CALL_DIRECTIONS };
+module.exports = { list, get, create, update, remove, metrics, CALL_OUTCOMES, CALL_DIRECTIONS };

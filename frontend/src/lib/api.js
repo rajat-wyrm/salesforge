@@ -55,6 +55,11 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // FIX 1: Ignore canceled requests so components can catch AbortErrors properly
+    if (axios.isCancel(error)) {
+      return Promise.reject(error);
+    }
+
     const status = error.response?.status;
     const data = error.response?.data || {};
     const requestUrl = error.config?.url || "";
@@ -78,7 +83,9 @@ api.interceptors.response.use(
       }
     }
 
-    const normalized = {
+    // FIX 2: Attach the normalized data, but RETURN THE ORIGINAL ERROR OBJECT.
+    // This ensures err.response and err.name still exist for components that rely on them.
+    error.normalized = {
       status,
       message: data.message || error.message || "Request failed",
       code: data.code,
@@ -86,7 +93,7 @@ api.interceptors.response.use(
       requestId: error.response?.headers?.["x-request-id"],
     };
 
-    return Promise.reject(normalized);
+    return Promise.reject(error);
   },
 );
 
