@@ -247,6 +247,22 @@ const OrganizationsList = () => {
       el.id = 'organization-styles';
       el.textContent = styles;
       document.head.appendChild(el);
+  const getHeaders = () => ({ 'Authorization': `Bearer ${localStorage.getItem('salesforge.token')||''}`, 'Content-Type': 'application/json' });
+
+  const fetchOrganizations = useCallback(async () => {
+    setLoading(true); setGlobalError(null);
+    try {
+      const res = await fetch(API_BASE_URL, { headers: getHeaders() });
+      if (!res.ok) throw new Error(`${res.status}`);
+      const data = await res.json();
+      setOrganizations((data.data || []).map(o => ({
+        ...o, _id: o.id || o._id,
+        createdAt: o.createdAt ? new Date(o.createdAt).toLocaleDateString() : 'N/A',
+      })));
+    } catch (err) {
+      setGlobalError('Failed to load organizations. Make sure the backend is running.');
+    } finally {
+      setLoading(false);
     }
   }, []);
 
