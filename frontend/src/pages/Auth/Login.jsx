@@ -1,174 +1,247 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { GoogleLogin } from "@react-oauth/google";
-import axios from "axios";
+import { Loader2, ArrowLeft, Mail, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { tokenStore } from "../../lib/api";
+import { api, tokenStore } from "../../lib/api";
+
+// View states
+const VIEW = {
+  GOOGLE: "google",       // default — shows Google button
+  FORGOT: "forgot",       // shows email input
+  SENT: "sent",           // shows "check your email" confirmation
+};
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login, isAuthenticated, loading, refresh } = useAuth();
-  const [form, setForm] = useState({ email: "", password: "" });
-  const [showPassword, setShowPassword] = useState(false);
+  const { isAuthenticated, loading, refresh } = useAuth();
+
+  const [view, setView] = useState(VIEW.GOOGLE);
   const [error, setError] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
+
+  // Forgot-password state
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetSending, setResetSending] = useState(false);
+  const [resetError, setResetError] = useState(null);
 
   useEffect(() => {
     if (!loading && isAuthenticated) navigate("/dashboard", { replace: true });
   }, [isAuthenticated, loading, navigate]);
 
-  const handleChange = (field) => (e) => setForm((p) => ({ ...p, [field]: e.target.value }));
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  /* ── Google OAuth ─────────────────────────────────────────── */
+  const handleGoogleSuccess = async (credentialResponse) => {
     setError(null);
-    setSubmitting(true);
+    setSigningIn(true);
     try {
-      await login(form.email, form.password);
+      const res = await api.post("/auth/google", {
+        credential: credentialResponse.credential,
+      });
+      tokenStore.set(res.data.data.token);
+      await refresh();
       navigate("/dashboard", { replace: true });
     } catch (err) {
-      setError(err.message || "Sign in failed");
+      const msg =
+        err?.response?.data?.message ||
+        err?.normalized?.message ||
+        "Google Sign-In failed. Please try again.";
+      setError(msg);
     } finally {
-      setSubmitting(false);
+      setSigningIn(false);
     }
   };
-const handleGoogleSuccess = async (credentialResponse) => {
-  console.log("Google Success");
-  console.log(credentialResponse);
 
-  try {
-    console.log("Sending request...");
+  /* ── Forgot password ──────────────────────────────────────── */
+  const handleSendReset = async (e) => {
+    e.preventDefault();
+    setResetError(null);
+    setResetSending(true);
+    try {
+      await api.post("/auth/forgot-password", { email: resetEmail });
+      setView(VIEW.SENT);
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.normalized?.message ||
+        "Could not send reset email. Please try again.";
+      setResetError(msg);
+    } finally {
+      setResetSending(false);
+    }
+  };
 
-    const res = await axios.post(
-      "http://localhost:3000/api/auth/google",
-      {
-        credential: credentialResponse.credential,
-      }
-    );
+  const goBack = () => {
+    setView(VIEW.GOOGLE);
+    setError(null);
+    setResetError(null);
+    setResetEmail("");
+  };
 
-    console.log("Backend response:", res.data);
+  /* ── Render helpers ───────────────────────────────────────── */
+  const renderGoogleView = () => (
+    <>
+      {/* Error banner */}
+      {error && (
+        <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300">
+          {error}
+        </div>
+      )}
 
-    tokenStore.set(res.data.data.token);
+      <div className="flex flex-col items-center gap-5">
+        {signingIn ? (
+          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+            <Loader2 className="h-4 w-4 animate-spin text-teal-500" />
+            Signing you in…
+          </div>
+        ) : (
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={() => setError("Google Sign-In failed. Please try again.")}
+            width="280"
+            text="continue_with"
+            shape="rectangular"
+            logo_alignment="left"
+          />
+        )}
 
-    await refresh();
+        <button
+          type="button"
+          onClick={() => { setView(VIEW.FORGOT); setError(null); }}
+          className="text-sm font-medium text-gray-500 hover:text-teal-600 dark:text-gray-400 dark:hover:text-teal-400 transition-colors"
+        >
+          Forgot password?
+        </button>
+      </div>
+    </>
+  );
 
-    navigate("/dashboard", { replace: true });
-  } catch (err) {
-    console.log("Axios Error:", err);
-    console.log(err.response);
+  const renderForgotView = () => (
+    <>
+      <button
+        type="button"
+        onClick={goBack}
+        className="mb-5 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" />
+        Back
+      </button>
 
-    setError("Google Sign-In failed.");
-  }
-};
+      <div className="mb-5 flex items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-500/10 text-teal-600 dark:bg-teal-500/20 dark:text-teal-400">
+          <Mail className="h-5 w-5" />
+        </div>
+        <div>
+          <p className="font-semibold text-gray-900 dark:text-white text-sm">Reset your password</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">We'll email you a secure sign-in link.</p>
+        </div>
+      </div>
 
+      {resetError && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300">
+          {resetError}
+        </div>
+      )}
+
+      <form onSubmit={handleSendReset} className="space-y-4">
+        <input
+          type="email"
+          required
+          autoFocus
+          value={resetEmail}
+          onChange={(e) => setResetEmail(e.target.value)}
+          placeholder="you@company.com"
+          className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
+        />
+        <button
+          type="submit"
+          disabled={resetSending}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-teal-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-teal-500/25 transition hover:bg-teal-600 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {resetSending && <Loader2 className="h-4 w-4 animate-spin" />}
+          {resetSending ? "Sending…" : "Send reset link"}
+        </button>
+      </form>
+    </>
+  );
+
+  const renderSentView = () => (
+    <div className="flex flex-col items-center gap-4 text-center">
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
+        <CheckCircle2 className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
+      </div>
+      <div>
+        <p className="font-semibold text-gray-900 dark:text-white">Check your email</p>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          If an account exists for <span className="font-medium text-gray-700 dark:text-gray-300">{resetEmail}</span>,
+          a reset link has been sent. Check your inbox (and spam folder).
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={goBack}
+        className="mt-2 text-sm font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300 transition-colors"
+      >
+        ← Back to sign in
+      </button>
+    </div>
+  );
+
+  /* ── Layout ───────────────────────────────────────────────── */
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-gray-50 transition-colors duration-300 dark:bg-gray-950">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-slate-50 via-white to-teal-50 px-4 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+      {/* Decorative blobs */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -left-32 h-[500px] w-[500px] rounded-full bg-teal-400/20 blur-3xl dark:bg-teal-500/10" />
+        <div className="absolute -bottom-40 -right-32 h-[500px] w-[500px] rounded-full bg-violet-400/20 blur-3xl dark:bg-violet-500/10" />
+      </div>
 
-      <div className="flex flex-1 items-center justify-center px-4">
-        <div className="w-full max-w-md rounded-3xl border border-gray-200 bg-white/80 p-8 shadow-2xl backdrop-blur-md transition-colors duration-300 dark:border-gray-800 dark:bg-gray-900/80">
-          <div className="mb-6 flex flex-col items-center text-center">
+      <div className="relative w-full max-w-sm">
+        {/* Card */}
+        <div className="rounded-3xl border border-gray-200/60 bg-white/80 p-8 shadow-2xl backdrop-blur-xl dark:border-gray-700/60 dark:bg-gray-900/80">
+
+          {/* Logo + heading (always visible) */}
+          <div className="mb-7 flex flex-col items-center text-center">
             <img
               src="/UptoSkillsLogo.webp"
               alt="UptoSkills Logo"
-              className="mb-3 h-14 w-auto object-contain"
+              className="mb-4 h-14 w-auto object-contain"
             />
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Welcome back</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Sign in to your SalesForge workspace</p>
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+              Welcome back
+            </h1>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Sign in to your SalesForge workspace
+            </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
-              <input
-                type="email"
-                value={form.email}
-                onChange={handleChange("email")}
-                required
-                autoComplete="email"
-                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm shadow-sm transition focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                placeholder="you@company.com"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Password</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={form.password}
-                  onChange={handleChange("password")}
-                  required
-                  autoComplete="current-password"
-                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 text-sm shadow-sm transition focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                  placeholder="••••••••"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((p) => !p)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
+          {/* Dynamic content */}
+          {view === VIEW.GOOGLE && renderGoogleView()}
+          {view === VIEW.FORGOT && renderForgotView()}
+          {view === VIEW.SENT  && renderSentView()}
 
-            <div className="flex items-center justify-between text-sm">
+          {/* Admin portal link (always visible) */}
+          {view === VIEW.GOOGLE && (
+            <div className="mt-8 border-t border-gray-100 pt-5 text-center dark:border-gray-800">
               <button
                 type="button"
-                onClick={() => navigate("/reset-password")}
-                className="font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400"
+                onClick={() => navigate("/admin-login")}
+                className="text-xs font-medium text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
               >
-                Forgot password?
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate("/signup")}
-                className="font-medium text-gray-600 hover:text-gray-900 dark:text-gray-300"
-              >
-                Create account
+                Admin portal →
               </button>
             </div>
-
-            {error && (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300">
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={submitting}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-teal-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-teal-500/30 transition hover:bg-teal-600 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-              {submitting ? "Signing in..." : "Sign in"}
-            </button>
-            <div className="my-4 flex items-center">
-  <div className="h-px flex-1 bg-gray-300 dark:bg-gray-700"></div>
-  <span className="px-3 text-xs text-gray-500">OR</span>
-  <div className="h-px flex-1 bg-gray-300 dark:bg-gray-700"></div>
-</div>
-
-<div className="flex justify-center">
-  <GoogleLogin
-    onSuccess={handleGoogleSuccess}
-    onError={() => setError("Google Sign-In failed")}
-  />
-</div>
-            
-          </form>
-
-          <div className="mt-6 text-center text-xs text-gray-500 dark:text-gray-400">
-            <button
-              type="button"
-              onClick={() => navigate("/admin-login")}
-              className="font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400"
-            >
-              Admin portal →
-            </button>
-          </div>
+          )}
         </div>
+
+        {/* Terms */}
+        {view === VIEW.GOOGLE && (
+          <p className="mt-4 text-center text-xs text-gray-400 dark:text-gray-600">
+            By continuing, you agree to our{" "}
+            <span className="cursor-pointer underline hover:text-gray-600 dark:hover:text-gray-400">Terms</span>
+            {" "}&amp;{" "}
+            <span className="cursor-pointer underline hover:text-gray-600 dark:hover:text-gray-400">Privacy Policy</span>.
+          </p>
+        )}
       </div>
     </div>
   );

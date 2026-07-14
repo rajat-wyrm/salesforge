@@ -67,7 +67,7 @@ export default function ModalManager() {
                   {selectedModal.details}
                 </p>
                 <Link
-                  to="/signup"
+                  to="/login"
                   onClick={() => setSelectedModal(null)}
                   className="inline-block px-6 py-3 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-lg font-semibold transition-all duration-300 hover:shadow-lg hover:shadow-violet-500/30 hover:scale-105"
                 >

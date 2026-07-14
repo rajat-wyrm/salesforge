@@ -21,7 +21,7 @@ initializeTheme();
 console.log("Google Client ID:", import.meta.env.VITE_GOOGLE_CLIENT_ID);
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || "812765521105-p3apunhk7sl0t5hh2hnkfca8qimq2821.apps.googleusercontent.com"}>
       <Suspense fallback={<LoadingFallback />}>
         <App />
       </Suspense>

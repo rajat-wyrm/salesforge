@@ -9,7 +9,7 @@ A complete B2B SaaS platform for sales teams — CRM, deal pipelines, activities
 ## Stack
 
 - **Backend**: Node.js, Express, Prisma ORM, PostgreSQL
-- **Frontend**: React, Vite, TailwindCSS, Lucide icons
+- **Frontend**: React.js, Vite, TailwindCSS, Lucide icons
 - **Auth**: JWT + sessions, 2FA TOTP, account lockout
 - **Real-time**: Server-Sent Events
 - **Integrations**: 12 pre-built (Slack, Gmail, Stripe, Zoom, etc.)

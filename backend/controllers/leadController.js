@@ -317,4 +317,4 @@ const stats = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { createLead, getLeads, getLeadById, updateLead, deleteLead, bulkUpdate, bulkDelete, stats };
+module.exports = { createLead, getLeads, getLeadById, updateLead, deleteLead, bulkUpdate, bulkDelete, stats, buildLeadWhere };

@@ -6,6 +6,10 @@ const response = require("../utils/response");
 const generateToken = require("../utils/generateToken");
 const { createNotification } = require("../services/notificationService");
 const { recordAudit } = require("../services/auditService");
+const { OAuth2Client } = require("google-auth-library");
+const crypto = require("crypto");
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const getSafeAdmin = (user) => ({
   id: user.id,
@@ -16,21 +20,41 @@ const getSafeAdmin = (user) => ({
 });
 
 const adminLogin = asyncHandler(async (req, res) => {
-  const email = req.body.email.toLowerCase();
-  let user = await prisma.user.findUnique({ where: { email } });
+  const { credential } = req.body;
 
+  if (!credential) {
+    throw new AppError("Google credential is required.", 400);
+  }
+
+  const ticket = await googleClient.verifyIdToken({
+    idToken: credential,
+    audience: process.env.GOOGLE_CLIENT_ID,
+  });
+
+  const payload = ticket.getPayload();
+  const email = payload.email.toLowerCase();
+
+  let user = await prisma.user.findUnique({ where: { email } });
   const hasAdmin = (await prisma.user.count({ where: { role: "ADMIN" } })) > 0;
+
   if (!user) {
     if (hasAdmin) throw new AppError("Invalid admin credentials.", 401);
-    const hashed = await bcrypt.hash(req.body.password, 12);
+    
+    // First admin setup via Google Login
+    const randomPassword = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 12);
     user = await prisma.user.create({
-      data: { name: "Platform Admin", email, password: hashed, role: "ADMIN", isVerified: true },
+      data: { 
+        name: payload.name || "Platform Admin", 
+        email, 
+        password: randomPassword, 
+        role: "ADMIN", 
+        isVerified: true,
+      },
     });
   } else {
     if (user.role !== "ADMIN") throw new AppError("This account is not an administrator.", 403);
-    const ok = await bcrypt.compare(req.body.password, user.password);
-    if (!ok) throw new AppError("Invalid admin credentials.", 401);
   }
+
   await createNotification({
     userId: user.id,
     type: "ADMIN_LOGIN",
@@ -44,6 +68,7 @@ const adminLogin = asyncHandler(async (req, res) => {
     entityId: user.id,
     ipAddress: req.ip,
   });
+
   return response.success(res, { token: generateToken(user), user: getSafeAdmin(user) });
 });
 

@@ -75,6 +75,7 @@ const create = asyncHandler(async (req, res) => {
   if (target === undefined) throw new AppError("target is required.", 400);
 
   const user = await prisma.user.findFirst({ where: { id: userId, organizationId: req.orgId } });
+  console.log("[DEBUG] quota create userId:", userId, "typeof:", typeof userId, "req.orgId:", req.orgId, "typeof:", typeof req.orgId, "userFound:", !!user);
   if (!user) throw new AppError("User not found in your organization.", 404);
 
   const cf = parseCustomFields(user.customFields);

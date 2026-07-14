@@ -1,3 +1,10 @@
+const path = require("path");
+const dotenv = require("dotenv");
+
+for (const envFile of [path.resolve(__dirname, "..", ".env.local"), path.resolve(__dirname, "..", ".env")]) {
+    dotenv.config({ path: envFile });
+}
+
 const { PrismaClient } = require('@prisma/client');
 // Reuse one Prisma client across the process so connection pooling stays predictable.
 const prisma = new PrismaClient();

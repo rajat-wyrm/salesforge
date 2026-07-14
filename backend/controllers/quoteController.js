@@ -37,11 +37,32 @@ const recalcTotals = (quote, items) => {
 };
 
 const list = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 50, status, dealId, search } = req.query;
+  const { page = 1, limit = 50, status, dealId, search, createdAfter, createdBefore, minAmount, maxAmount, createdById } = req.query;
   const where = { orgId: req.orgId };
+  
   if (status) where.status = status;
   if (dealId) where.dealId = Number(dealId);
-  if (search) where.title = { contains: search, mode: "insensitive" };
+  if (createdById) where.createdById = Number(createdById);
+  
+  if (search) {
+    where.OR = [
+      { title: { contains: search, mode: "insensitive" } },
+      { number: { contains: search, mode: "insensitive" } },
+    ];
+  }
+
+  if (createdAfter || createdBefore) {
+    where.createdAt = {};
+    if (createdAfter) where.createdAt.gte = new Date(createdAfter);
+    if (createdBefore) where.createdAt.lte = new Date(createdBefore);
+  }
+
+  if (minAmount || maxAmount) {
+    where.total = {};
+    if (minAmount) where.total.gte = Number(minAmount);
+    if (maxAmount) where.total.lte = Number(maxAmount);
+  }
+
   const skip = (Number(page) - 1) * Number(limit);
   const [items, total] = await Promise.all([
     prisma.quote.findMany({
@@ -182,20 +203,24 @@ const remove = asyncHandler(async (req, res) => {
 });
 
 const metrics = asyncHandler(async (req, res) => {
-  const [total, draft, sent, accepted, rejected, totalValue, acceptedValue] = await Promise.all([
+  const [total, draft, sent, viewed, accepted, rejected, expired, totalValue, acceptedValue] = await Promise.all([
     prisma.quote.count({ where: { orgId: req.orgId } }),
     prisma.quote.count({ where: { orgId: req.orgId, status: "DRAFT" } }),
-    prisma.quote.count({ where: { orgId: req.orgId, status: { in: ["SENT", "VIEWED"] } } }),
+    prisma.quote.count({ where: { orgId: req.orgId, status: "SENT" } }),
+    prisma.quote.count({ where: { orgId: req.orgId, status: "VIEWED" } }),
     prisma.quote.count({ where: { orgId: req.orgId, status: "ACCEPTED" } }),
     prisma.quote.count({ where: { orgId: req.orgId, status: "REJECTED" } }),
+    prisma.quote.count({ where: { orgId: req.orgId, status: "EXPIRED" } }),
     prisma.quote.aggregate({ where: { orgId: req.orgId }, _sum: { total: true } }),
     prisma.quote.aggregate({ where: { orgId: req.orgId, status: "ACCEPTED" }, _sum: { total: true } }),
   ]);
   const winRate = total > 0 ? Math.round((accepted / total) * 100) : 0;
+  const avgQuoteValue = total > 0 ? Math.round((totalValue._sum.total || 0) / total) : 0;
   return response.success(res, {
-    total, draft, sent, accepted, rejected,
+    total, draft, sent, viewed, accepted, rejected, expired,
     totalValue: totalValue._sum.total || 0,
     acceptedValue: acceptedValue._sum.total || 0,
+    avgQuoteValue,
     winRate,
   });
 });

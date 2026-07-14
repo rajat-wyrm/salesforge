@@ -9,8 +9,6 @@ import ChatBot from "../components/ChatBot";
 import CommandPalette from "@/components/CommandPalette";
 
 import Login from "../pages/Auth/Login";
-import Signup from "../pages/Auth/Signup";
-import ResetPassword from "../pages/Auth/ResetPassword";
 import AdminLogin from "../pages/Auth/AdminLogin";
 import Landing from "../pages/Landing/LandingPage";
 import DashboardLayout from "../components/layout/DashboardLayout";
@@ -33,6 +31,7 @@ import { Usage, Audit, Sessions, TwoFactor } from "../pages/Dashboard/Settings";
 import { Changelog, Onboarding, NotificationPreferences, DataExport } from "../pages/Dashboard/Extras";
 import AdminDashboard from "../pages/Dashboard/AdminDashboard";
 import Quotes from "../pages/Dashboard/Quotes";
+import QuoteDetail from "../pages/Dashboard/QuoteDetail";
 import Products from "../pages/Dashboard/Products";
 import Playbooks from "../pages/Dashboard/Playbooks";
 import Analytics from "../pages/Dashboard/Analytics";
@@ -78,8 +77,9 @@ const App = () => (
         <Route path="/" element={<ErrorBoundary><RootRedirect /></ErrorBoundary>} />
         <Route path="/login-gateway" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<ErrorBoundary><Login /></ErrorBoundary>} />
-        <Route path="/signup" element={<ErrorBoundary><Signup /></ErrorBoundary>} />
-        <Route path="/reset-password" element={<ErrorBoundary><ResetPassword /></ErrorBoundary>} />
+        <Route path="/signup" element={<Navigate to="/login" replace />} />
+        <Route path="/register" element={<Navigate to="/login" replace />} />
+        <Route path="/reset-password" element={<Navigate to="/login" replace />} />
         <Route path="/admin-login" element={<ErrorBoundary><AdminLogin /></ErrorBoundary>} />
 
         <Route element={<RequireAuth><ErrorBoundary><DashboardLayout /></ErrorBoundary></RequireAuth>}>
@@ -99,6 +99,7 @@ const App = () => (
           <Route path="/leads/:id" element={<LeadDetail />} />
           <Route path="/deals" element={<Deals />} />
           <Route path="/quotes" element={<Quotes />} />
+          <Route path="/quotes/:id" element={<QuoteDetail />} />
           <Route path="/products" element={<Products />} />
           <Route path="/playbooks" element={<Playbooks />} />
           <Route path="/analytics" element={<Analytics />} />

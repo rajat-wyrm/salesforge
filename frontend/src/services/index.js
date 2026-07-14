@@ -20,7 +20,12 @@ export const leadService = {
   myTasks: (params) => unwrapList(api.get("/lead-tasks/me/tasks", { params })),
   activity: (leadId, params) => unwrapList(api.get(`/lead-activity/${leadId}/activity`, { params })),
   import: (csv) => unwrap(api.post("/csv/leads/import", { csv })),
-  exportUrl: () => `${api.defaults.baseURL}/csv/leads/export`,
+  exportUrl: (filters = {}) => {
+    const q = new URLSearchParams(Object.fromEntries(Object.entries(filters).filter(([_, v]) => v !== "" && v !== null)));
+    const token = typeof window !== "undefined" ? localStorage.getItem("salesforge.token") : null;
+    if (token) q.append("token", token);
+    return `${api.defaults.baseURL}/csv/leads/export?${q.toString()}`;
+  },
 };
 
 export const tagService = {

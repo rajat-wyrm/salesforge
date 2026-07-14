@@ -75,22 +75,44 @@ const remove = asyncHandler(async (req, res) => {
 });
 
 const analytics = asyncHandler(async (req, res) => {
-  const [byOutcome, byLossReason, byMonth, totalWon, totalLost, totalAmount] = await Promise.all([
-    prisma.winLossRecord.groupBy({ by: ["outcome"], where: { orgId: req.orgId }, _count: { outcome: true }, _sum: { amount: true } }),
-    prisma.winLossRecord.groupBy({ by: ["lossReason"], where: { orgId: req.orgId, outcome: "LOST" }, _count: { lossReason: true } }),
-    prisma.$queryRaw`SELECT TO_CHAR("closedAt", 'YYYY-MM') as month, outcome, COUNT(*)::int as count, SUM(amount)::float as total FROM "win_loss_records" WHERE "orgId" = ${req.orgId} GROUP BY month, outcome ORDER BY month DESC LIMIT 24`,
-    prisma.winLossRecord.count({ where: { orgId: req.orgId, outcome: "WON" } }),
-    prisma.winLossRecord.count({ where: { orgId: req.orgId, outcome: "LOST" } }),
-    prisma.winLossRecord.aggregate({ where: { orgId: req.orgId }, _sum: { amount: true }, _avg: { amount: true } }),
-  ]);
+  const orgId = req.orgId;
+
+  const byOutcome = await prisma.winLossRecord.groupBy({
+    by: ["outcome"],
+    where: { orgId },
+    _count: { outcome: true },
+    _sum: { amount: true },
+  });
+
+  const byLossReason = await prisma.winLossRecord.groupBy({
+    by: ["lossReason"],
+    where: { orgId, outcome: "LOST" },
+    _count: { lossReason: true },
+  });
+
+  const byMonth = await prisma.$queryRaw`SELECT TO_CHAR("closedAt", 'YYYY-MM') as month, outcome, COUNT(*)::int as count, SUM(amount)::float as total FROM "win_loss_records" WHERE "orgId" = ${orgId} GROUP BY month, outcome ORDER BY month DESC LIMIT 24`;
+
+  const totalWon = await prisma.winLossRecord.count({ where: { orgId, outcome: "WON" } });
+  const totalLost = await prisma.winLossRecord.count({ where: { orgId, outcome: "LOST" } });
+  const totalAmount = await prisma.winLossRecord.aggregate({
+    where: { orgId },
+    _sum: { amount: true },
+    _avg: { amount: true },
+  });
+
   const total = totalWon + totalLost;
   const winRate = total > 0 ? Math.round((totalWon / total) * 100) : 0;
   const avgDealSize = totalAmount._avg.amount || 0;
+
   return response.success(res, {
     byOutcome: byOutcome.map((b) => ({ outcome: b.outcome, count: b._count.outcome, total: b._sum.amount || 0 })),
     byLossReason: byLossReason.map((b) => ({ lossReason: b.lossReason, count: b._count.lossReason })).filter((x) => x.lossReason),
     byMonth,
-    totalWon, totalLost, total, winRate, avgDealSize,
+    totalWon,
+    totalLost,
+    total,
+    winRate,
+    avgDealSize,
   });
 });
 

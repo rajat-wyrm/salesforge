@@ -1,4 +1,8 @@
-require("dotenv").config();
+const path = require("path");
+
+for (const envFile of [path.resolve(__dirname, ".env.local"), path.resolve(__dirname, ".env")]) {
+  require("dotenv").config({ path: envFile });
+}
 
 const app = require("./app");
 const { connectPostgres, prisma } = require("./config/postgres");

@@ -181,7 +181,7 @@ function Hero() {
               className="flex flex-col sm:flex-row gap-4"
             >
               <Link
-                to="/signup"
+                to="/login"
                 className="px-8 py-4 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-lg font-semibold transition-all duration-300 hover:shadow-xl hover:shadow-violet-500/40 hover:scale-105 flex items-center justify-center gap-2"
               >
                 Get Started Free

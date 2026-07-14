@@ -106,7 +106,7 @@ function CTA() {
           className="flex flex-col sm:flex-row gap-4 justify-center"
         >
           <Link
-            to="/signup"
+            to="/login"
             className="px-8 py-4 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-lg font-semibold transition-all duration-300 hover:shadow-xl hover:shadow-violet-500/40 hover:scale-105"
           >
             Start for Free

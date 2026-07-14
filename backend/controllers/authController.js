@@ -496,29 +496,13 @@ const googleLogin = asyncHandler(async (req, res) => {
         email,
         password: randomPassword,
         role: "OWNER",
-        organizationId: org.id,
+        organization: { connect: { id: org.id } },
         isVerified: true,
-        googleId: payload.sub,
-        avatar: payload.picture,
-        provider: "GOOGLE",
       },
     });
 
     await prisma.orgMembership.create({
-      data: {
-        userId: user.id,
-        orgId: org.id,
-        role: "OWNER",
-      },
-    });
-  } else {
-    user = await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        googleId: payload.sub,
-        avatar: payload.picture,
-        provider: "GOOGLE",
-      },
+      data: { userId: user.id, orgId: org.id, role: "OWNER" },
     });
   }
 

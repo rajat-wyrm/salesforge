@@ -3,6 +3,7 @@ const { AppError } = require("../middleware/errorHandler");
 const asyncHandler = require("../utils/asyncHandler");
 const response = require("../utils/response");
 const { recordActivity } = require("../services/leadActivityService");
+const { buildLeadWhere } = require("./leadController");
 const slugify = require("../utils/slugify");
 
 // Lightweight CSV parser that handles quoted fields, escaped quotes, and embedded newlines.
@@ -135,10 +136,8 @@ const importLeads = asyncHandler(async (req, res) => {
 });
 
 const exportLeads = asyncHandler(async (req, res) => {
-  const { status, source } = req.query;
-  const where = { orgId: req.orgId };
-  if (status) where.status = status;
-  if (source) where.source = source;
+  const { search, status, source, tagId, assigneeId, scoreMin, scoreMax } = req.query;
+  const where = { orgId: req.orgId, ...buildLeadWhere({ search, status, source, tagId, assigneeId, scoreMin, scoreMax }) };
   const leads = await prisma.lead.findMany({
     where,
     orderBy: { createdAt: "desc" },

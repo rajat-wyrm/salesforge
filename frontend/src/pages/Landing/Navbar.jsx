@@ -137,12 +137,12 @@ function Navbar() {
             Log in
           </Link>
 
-          {/* Sign Up */}
+          {/* Get Started */}
           <Link
-            to="/signup"
+            to="/login"
             className="px-6 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-lg font-medium text-sm hover:scale-105 transition"
           >
-            Sign Up
+            Get Started
           </Link>
 
           {/* Mobile Menu Toggle Button (BULLETPROOF SVG ICON) */}

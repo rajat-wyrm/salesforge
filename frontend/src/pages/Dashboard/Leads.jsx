@@ -55,17 +55,38 @@ const Leads = () => {
   useEffect(() => { load(1, filters); }, []);
   useEffect(() => { tagService.list().then(setTags).catch(() => {}); savedSearchService.list({ resource: "leads" }).then((r) => setSavedSearches(r || [])).catch(() => {}); }, []);
 
+  // Auto-apply filters when they change
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      load(1, filters);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [filters.status, filters.source, filters.tagId, filters.search]);
+
   const create = async (e) => {
     e.preventDefault();
     try { await leadService.create(draft); toast.success("Lead created"); setShowCreate(false); setDraft({ name: "", email: "", companyName: "", status: "new", source: "website" }); load(1); }
     catch (err) { toast.error(err.message); }
   };
-  const importLeads = async () => {
-    try {
-      const r = await leadService.import(csv);
-      toast.success(`Imported ${r.created} new, updated ${r.updated}, ${r.failed} failed`);
-      setShowImport(false); setCsv(""); load(1);
-    } catch (e) { toast.error(e.message); }
+  const importLeads = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target.result;
+        const r = await leadService.import(text);
+        toast.success(`Imported ${r.created} new, updated ${r.updated}, ${r.failed} failed`);
+        setShowImport(false);
+        load(1, filters);
+      } catch (err) {
+        toast.error(err.message || "Failed to import CSV");
+      }
+    };
+    reader.readAsText(file);
+    // Reset input so the same file can be selected again
+    e.target.value = null;
   };
   const saveSearch = async () => {
     const name = prompt("Name this search");
@@ -111,7 +132,7 @@ const Leads = () => {
               <Button variant="secondary" onClick={() => setShowImport((p) => !p)} className={!darkMode ? "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50" : "bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700"}>
                 <Upload className="h-4 w-4" /> Import CSV
               </Button>
-              <a href={leadService.exportUrl()} target="_blank" rel="noreferrer">
+              <a href={leadService.exportUrl(filters)} target="_blank" rel="noreferrer">
                 <Button variant="secondary" className={!darkMode ? "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50" : "bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700"}>
                   <Download className="h-4 w-4" /> Export
                 </Button>
@@ -144,7 +165,7 @@ const Leads = () => {
               <option value="">All Tags</option>
               {tags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
-            <Button onClick={() => load(1, filters)} className="bg-[#00b5ad] text-white hover:bg-[#2dd4bf]">Apply</Button>
+
             <Button onClick={saveSearch} variant="secondary" className={!darkMode ? "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50" : "bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700"}>
               <Save className="h-4 w-4" /> Save
             </Button>
@@ -194,10 +215,19 @@ const Leads = () => {
         <section>
           <div className={`rounded-2xl p-6 border ${card}`}>
             <h3 className={`text-base font-semibold mb-4 ${heading}`}>Import CSV</h3>
-            <textarea value={csv} onChange={(e) => setCsv(e.target.value)} rows={6} placeholder="name,email,phone,domain,company_name,job_title,status,source&#10;Jane,jane@acme.com" className={`w-full rounded-xl border p-3 font-mono text-xs ${inputBg}`} />
-            <div className="mt-2 flex gap-2">
-              <Button onClick={importLeads} className="bg-[#00b5ad] text-white hover:bg-[#2dd4bf]">Import</Button>
-              <Button onClick={() => setShowImport(false)} variant="secondary" className={!darkMode ? "bg-white text-slate-700 border border-slate-300" : "bg-slate-800 text-slate-200 border border-slate-700"}>Cancel</Button>
+            <p className={`text-sm mb-4 ${subtext}`}>
+              Upload a .csv file containing your leads. Required columns are: <code>name</code>, <code>email</code>.
+            </p>
+            <div className="flex flex-col gap-4">
+              <input
+                type="file"
+                accept=".csv"
+                onChange={importLeads}
+                className={`block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#00b5ad] file:text-white hover:file:bg-[#2dd4bf] cursor-pointer ${subtext}`}
+              />
+              <div className="flex gap-2">
+                <Button onClick={() => setShowImport(false)} variant="secondary" className={!darkMode ? "bg-white text-slate-700 border border-slate-300" : "bg-slate-800 text-slate-200 border border-slate-700"}>Cancel</Button>
+              </div>
             </div>
           </div>
         </section>
