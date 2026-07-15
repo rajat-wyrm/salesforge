@@ -4,8 +4,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ============================================================
@@ -118,6 +119,7 @@ model User {
   quotes                  Quote[]                  @relation("QuoteCreator")
   playbooks               Playbook[]               @relation("PlaybookCreator")
   winLossRecords          WinLossRecord[]          @relation("WinLossRecorder")
+  intelSearches           IntelSearch[]
 
   @@map("users")
 }
@@ -175,6 +177,7 @@ model Organization {
   playbooks               Playbook[]
   winLossRecords          WinLossRecord[]
   emailEvents             EmailEvent[]
+  intelSearches           IntelSearch[]
 
   @@map("organizations")
 }
@@ -1561,3 +1564,28 @@ model EmailEvent {
   @@index([createdAt])
   @@map("email_events")
 }
+
+// ============================================================
+//  OSINT & SALES INTELLIGENCE HUB SEARCHES
+// ============================================================
+
+model IntelSearch {
+  id        Int          @id @default(autoincrement())
+  userId    Int
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orgId     Int?
+  org       Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  module    String       // e.g. "email_intelligence", "domain_intelligence"
+  query     String
+  filters   Json?        @default("{}")
+  results   Json
+  isPinned    Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([userId])
+  @@index([orgId])
+  @@index([module])
+  @@map("intel_searches")
+}
+

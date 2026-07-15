@@ -244,20 +244,38 @@ const kanbanView = asyncHandler(async (req, res) => {
 
 const metrics = asyncHandler(async (req, res) => {
   const orgId = req.orgId;
-  const [total, won, lost, open, sumAmount, wonAmount, lostAmount] = await Promise.all([
+  const [total, won, lost, wonAmount, lostAmount, activeDeals] = await Promise.all([
     prisma.deal.count({ where: { orgId } }),
     prisma.deal.count({ where: { orgId, status: "COMPLETED" } }),
     prisma.deal.count({ where: { orgId, status: "INACTIVE" } }),
-    prisma.deal.count({ where: { orgId, status: "ACTIVE" } }),
-    prisma.deal.aggregate({ where: { orgId, status: "ACTIVE" }, _sum: { amount: true } }),
     prisma.deal.aggregate({ where: { orgId, status: "COMPLETED" }, _sum: { amount: true } }),
     prisma.deal.aggregate({ where: { orgId, status: "INACTIVE" }, _sum: { amount: true } }),
+    prisma.deal.findMany({ where: { orgId, status: "ACTIVE" } }),
   ]);
+
+  const openCount = activeDeals.length;
+  const openAmount = activeDeals.reduce((sum, d) => sum + (d.amount || 0), 0);
+
+  const commitDeals = activeDeals.filter((d) => (d.probability || 0) >= 90);
+  const commitCount = commitDeals.length;
+  const commitAmount = commitDeals.reduce((sum, d) => sum + (d.amount || 0), 0);
+
+  const bestCaseDeals = activeDeals.filter((d) => (d.probability || 0) >= 50);
+  const bestCaseCount = bestCaseDeals.length;
+  const bestCaseAmount = bestCaseDeals.reduce((sum, d) => sum + (d.amount || 0), 0);
+
+  const weightedPipeline = activeDeals.reduce((sum, d) => sum + (d.amount || 0) * ((d.probability || 0) / 100), 0);
+
   const wonRate = total > 0 ? Math.round((won / total) * 100) : 0;
-  const weightedPipeline = (sumAmount._sum.amount || 0) * 0.5; // rough weighted estimate
+
   return response.success(res, {
-    total, won, lost, open,
-    pipelineValue: sumAmount._sum.amount || 0,
+    total,
+    won,
+    lost,
+    open: { count: openCount, amount: openAmount },
+    commit: { count: commitCount, amount: commitAmount },
+    bestCase: { count: bestCaseCount, amount: bestCaseAmount },
+    pipelineValue: openAmount,
     wonValue: wonAmount._sum.amount || 0,
     lostValue: lostAmount._sum.amount || 0,
     wonRate,

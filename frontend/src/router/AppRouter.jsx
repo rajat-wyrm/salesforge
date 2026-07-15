@@ -54,6 +54,7 @@ import EmailSearch from "../components/Tools/Email/EmailSearch";
 import DomainSearch from "../components/Tools/Domain/DomainSearch";
 import DatabaseSearch from "../components/Tools/Database/DatabaseSearch";
 import URLSearch from "../components/Tools/SocialUrl/SocialUrlSearch";
+import IntelHub from "../components/Tools/IntelHub/IntelHub";
 import Settings1 from "../components/Tools/Settings1/Settings1";
 import Notifications from "../components/Tools/Notifications/Notification";
 
@@ -124,10 +125,11 @@ const App = () => (
           <Route path="/health-scores" element={<HealthScores />} />
           <Route path="/ai-insights" element={<AIInsights />} />
 
-          <Route path="/tools/email" element={<EmailSearch />} />
-          <Route path="/tools/domain" element={<DomainSearch />} />
-          <Route path="/tools/database" element={<DatabaseSearch />} />
-          <Route path="/tools/url" element={<URLSearch />} />
+          <Route path="/tools/email" element={<IntelHub defaultModule="email_intelligence" />} />
+          <Route path="/tools/domain" element={<IntelHub defaultModule="domain_intelligence" />} />
+          <Route path="/tools/database" element={<IntelHub defaultModule="person_search" />} />
+          <Route path="/tools/url" element={<IntelHub defaultModule="social_media_search" />} />
+          <Route path="/tools/intel" element={<IntelHub />} />
 
           {/* Automation */}
           <Route path="/templates" element={<Templates />} />

@@ -451,3 +451,12 @@ export const aiScoringService = {
   scoreBatch: (ids) => unwrap(api.post("/ai-scoring/score-batch", { ids })),
   scoreAll: () => unwrap(api.post("/ai-scoring/score-all")),
 };
+
+export const intelService = {
+  search: (data) => unwrap(api.post("/intel/search", data)),
+  history: (params) => unwrapList(api.get("/intel/history", { params })),
+  togglePin: (id) => unwrap(api.patch(`/intel/history/${id}/pin`)),
+  deleteHistory: (id) => unwrap(api.delete(`/intel/history/${id}`)),
+  saved: () => unwrap(api.get("/intel/saved")),
+  saveQuery: (data) => unwrap(api.post("/intel/saved", data)),
+};
