@@ -9,7 +9,7 @@ import { Ticket, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 const STATUSES = ["open", "in_progress", "waiting", "resolved", "closed"];
-const PRIORITIES = ["low", "medium", "high", "urgent"];
+const PRIORITIES = ["low", "medium", "high", "critical"];
 
 const Tickets = () => {
   const [items, setItems] = useState([]);
@@ -42,7 +42,7 @@ const Tickets = () => {
   };
 
   const handleStatus = async (id, status) => {
-    try { await ticketService.update(id, { status }); load(); } catch (_) {}
+    try { await ticketService.update(id, { status }); load(); } catch (_) { }
   };
 
   return (
@@ -82,7 +82,11 @@ const Tickets = () => {
             <div className="space-y-3">
               <UptoInput label="Subject" value={draft.subject} onChange={(e) => setDraft({ ...draft, subject: e.target.value })} required />
               <UptoTextarea label="Description" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} required />
-              <UptoSelect label="Priority" value={draft.priority} onChange={(e) => setDraft({ ...draft, priority: e.target.value })} options={PRIORITIES.map((p) => ({ value: p, label: p }))} />
+              <UptoSelect label="Priority" value={draft.priority} onChange={(e) => setDraft({ ...draft, priority: e.target.value })}>
+                {PRIORITIES.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </UptoSelect>
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <UptoButton type="button" variant="ghost" onClick={() => setShowCreate(false)}>Cancel</UptoButton>
