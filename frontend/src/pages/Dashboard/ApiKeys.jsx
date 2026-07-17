@@ -49,6 +49,24 @@ const ApiKeys = () => {
     catch (e) { toast.error(e.message); }
   };
 
+  const toggleActive = async (id, currentStatus) => {
+    try {
+      await apiKeyService.update(id, { active: !currentStatus });
+      toast.success(`API key ${!currentStatus ? 'enabled' : 'disabled'}`);
+      await load();
+    } catch (e) { toast.error(e.message); }
+  };
+
+  const regenerateKey = async (id) => {
+    if (!confirm("Regenerate this API key? The old key will immediately stop working.")) return;
+    try {
+      const k = await apiKeyService.regenerate(id);
+      setCreated({ ...k, name: "Regenerated Key" });
+      toast.success("API key regenerated. Copy it now — you won't see it again.");
+      await load();
+    } catch (e) { toast.error(e.message); }
+  };
+
   if (loading) return <UptoSpinner />;
   if (error) return <UptoError error={error} onRetry={load} />;
 
@@ -66,7 +84,7 @@ const ApiKeys = () => {
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
                   <thead className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    <tr><th className="py-3 px-2">Name</th><th className="py-3 px-2">Key</th><th className="py-3 px-2">Scopes</th><th className="py-3 px-2">Last used</th><th className="py-3 px-2 text-right">Actions</th></tr>
+                    <tr><th className="py-3 px-2">Name</th><th className="py-3 px-2">Key</th><th className="py-3 px-2">Scopes</th><th className="py-3 px-2">Status</th><th className="py-3 px-2">Last used</th><th className="py-3 px-2 text-right">Actions</th></tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {keys.map((k) => (
@@ -74,8 +92,16 @@ const ApiKeys = () => {
                         <td className={`py-3 px-2 font-medium ${s.heading}`}>{k.name}</td>
                         <td className="py-3 px-2 font-mono text-xs">{k.keyPrefix}…</td>
                         <td className="py-3 px-2"><UptoBadge>{k.scopes}</UptoBadge></td>
+                        <td className="py-3 px-2">
+                          <button onClick={() => toggleActive(k.id, k.active)}>
+                            <UptoBadge tone={k.active ? "success" : "warning"}>{k.active ? "Active" : "Disabled"}</UptoBadge>
+                          </button>
+                        </td>
                         <td className={`py-3 px-2 text-xs ${s.muted}`}>{k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleString() : "Never"}</td>
-                        <td className="py-3 px-2 text-right"><UptoButton variant="ghost" onClick={() => revoke(k.id)} className="text-red-500"><Trash2 className="h-4 w-4" /></UptoButton></td>
+                        <td className="py-3 px-2 text-right flex items-center justify-end gap-2">
+                          <UptoButton variant="ghost" onClick={() => regenerateKey(k.id)} title="Regenerate" className="text-blue-500"><RotateCw className="h-4 w-4" /></UptoButton>
+                          <UptoButton variant="ghost" onClick={() => revoke(k.id)} title="Delete" className="text-red-500"><Trash2 className="h-4 w-4" /></UptoButton>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -130,6 +156,7 @@ const Webhooks = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({ name: "", url: "", events: [] });
 
   const load = async () => {
@@ -143,16 +170,37 @@ const Webhooks = () => {
   };
   useEffect(() => { load(); }, []);
 
-  const create = async (e) => {
+  const save = async (e) => {
     e.preventDefault();
     if (form.events.length === 0) return toast.error("Select at least one event");
+    if (!/^https?:\/\//.test(form.url)) return toast.error("URL must start with http:// or https://");
     try {
-      await webhookService.create(form);
+      if (editingId) {
+        await webhookService.update(editingId, form);
+        toast.success("Webhook updated");
+      } else {
+        await webhookService.create(form);
+        toast.success("Webhook created");
+      }
       setForm({ name: "", url: "", events: [] });
       setShowCreate(false);
-      toast.success("Webhook created");
+      setEditingId(null);
       await load();
     } catch (err) { toast.error(err.message); }
+  };
+
+  const toggleWebhookActive = async (id, currentActive) => {
+    try {
+      await webhookService.update(id, { active: !currentActive });
+      toast.success(`Webhook ${!currentActive ? 'enabled' : 'disabled'}`);
+      await load();
+    } catch (e) { toast.error(e.message); }
+  };
+
+  const editHook = (h) => {
+    setForm({ name: h.name, url: h.url, events: h.events.split(",") });
+    setEditingId(h.id);
+    setShowCreate(true);
   };
 
   const testHook = async (id) => {
@@ -178,14 +226,14 @@ const Webhooks = () => {
   return (
     <UptoPage>
       <UptoHero title="Webhooks" subtitle="Subscribe to events and send them to your own services." darkMode={darkMode}
-        actions={isAdmin && <UptoButton onClick={() => setShowCreate((p) => !p)}><Plus className="h-4 w-4" /> New Webhook</UptoButton>}
+        actions={isAdmin && <UptoButton onClick={() => { setForm({ name: "", url: "", events: [] }); setEditingId(null); setShowCreate((p) => !p); }}><Plus className="h-4 w-4" /> New Webhook</UptoButton>}
       />
 
       {showCreate && (
         <section>
           <UptoCard>
-            <UptoSectionHeading label="Create Webhook" darkMode={darkMode} />
-            <form onSubmit={create} className="space-y-3">
+            <UptoSectionHeading label={editingId ? "Edit Webhook" : "Create Webhook"} darkMode={darkMode} />
+            <form onSubmit={save} className="space-y-3">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <UptoInput label="Name" placeholder="My CRM" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} required />
                 <UptoInput label="URL" placeholder="https://example.com/webhook" value={form.url} onChange={(e) => setForm((p) => ({ ...p, url: e.target.value }))} required />
@@ -203,8 +251,8 @@ const Webhooks = () => {
                 </div>
               </div>
               <div className="flex gap-2">
-                <UptoButton type="submit">Create Webhook</UptoButton>
-                <UptoButton type="button" variant="secondary" onClick={() => setShowCreate(false)}>Cancel</UptoButton>
+                <UptoButton type="submit">{editingId ? "Update Webhook" : "Create Webhook"}</UptoButton>
+                <UptoButton type="button" variant="secondary" onClick={() => { setShowCreate(false); setEditingId(null); }}>Cancel</UptoButton>
               </div>
             </form>
           </UptoCard>
@@ -224,7 +272,9 @@ const Webhooks = () => {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <p className={`font-semibold ${s.heading}`}>{h.name}</p>
-                        {h.active ? <UptoBadge tone="success">Active</UptoBadge> : <UptoBadge tone="warning">Paused</UptoBadge>}
+                        <button onClick={() => toggleWebhookActive(h.id, h.active)}>
+                          {h.active ? <UptoBadge tone="success">Active</UptoBadge> : <UptoBadge tone="warning">Paused</UptoBadge>}
+                        </button>
                         {h.failureCount > 0 && <UptoBadge tone="danger">{h.failureCount} failures</UptoBadge>}
                       </div>
                       <p className={`mt-0.5 truncate text-sm ${s.muted}`}>{h.url}</p>
@@ -233,6 +283,7 @@ const Webhooks = () => {
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
+                      {isAdmin && <UptoButton variant="ghost" onClick={() => editHook(h)} title="Edit"><Eye className="h-4 w-4" /></UptoButton>}
                       {isAdmin && <UptoButton variant="ghost" onClick={() => testHook(h.id)} title="Send test"><Send className="h-4 w-4" /></UptoButton>}
                       {isAdmin && <UptoButton variant="ghost" onClick={() => remove(h.id)} className="text-red-500" title="Delete"><Trash2 className="h-4 w-4" /></UptoButton>}
                     </div>

@@ -586,6 +586,7 @@ model ApiKey {
   userId     Int
   user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   scopes     String        @default("read,write")
+  active     Boolean       @default(true)
   lastUsedAt DateTime?
   expiresAt  DateTime?
   revokedAt  DateTime?

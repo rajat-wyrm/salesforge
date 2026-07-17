@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { integrationMarketplaceService } from "@/services";
 import { useUptoStyles, UptoPage, UptoHero, UptoSectionHeading, UptoButton, UptoBadge, UptoSpinner, UptoError, UptoEmptyState, UptoCard } from "@/components/UI/UptoHooks";
-import { Plug, Plus, RefreshCw, Trash2, MessageSquare, Mail, Calendar, Linkedin, Video, CreditCard, Briefcase, Workflow, Star } from "lucide-react";
+import { Plug, Plus, RefreshCw, Trash2, MessageSquare, Mail, Calendar, Linkedin, Video, CreditCard, Briefcase, Workflow, Star, Settings, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 
@@ -15,6 +15,7 @@ const Integrations = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [installing, setInstalling] = useState(null);
+  const [configModal, setConfigModal] = useState({ open: false, provider: null, fields: [], data: {}, isEdit: false });
 
   const load = async () => {
     setLoading(true);
@@ -22,17 +23,53 @@ const Integrations = () => {
     catch (e) { setError(e.message); }
     finally { setLoading(false); }
   };
-  useEffect(() => { load(); }, []);
 
-  const install = async (provider) => {
+  useEffect(() => {
+    load();
+  }, []);
+
+  const handleConnectClick = (provider) => {
+    install(provider, {});
+  };
+
+  const handleEditClick = (provider, currentConfig) => {
+    const meta = items.find((i) => i.id === provider);
+    if (meta?.configFields && meta.configFields.length > 0) {
+      setConfigModal({ open: true, provider, fields: meta.configFields, data: currentConfig || {}, isEdit: true });
+    } else {
+      toast.info("This integration has no configurable settings.");
+    }
+  };
+
+  const install = async (provider, config, code = null) => {
     setInstalling(provider);
     try {
-      const meta = items.find((i) => i.id === provider);
-      await integrationMarketplaceService.install({ provider, name: meta?.name || provider, config: {} });
+      // Find meta if available, else just use the provider name. Backend will use actual name if omitted.
+      const meta = items.length > 0 ? items.find((i) => i.id === provider) : { name: provider.charAt(0).toUpperCase() + provider.slice(1) };
+      await integrationMarketplaceService.install({ provider, name: meta?.name || provider, config, code });
       toast.success(`${meta?.name || provider} connected`);
+      setConfigModal((p) => ({ ...p, open: false }));
       load();
     } catch (e) { toast.error(e.message); }
     finally { setInstalling(null); }
+  };
+
+  const updateConfig = async (provider, config) => {
+    setInstalling(provider);
+    try {
+      await integrationMarketplaceService.update(provider, { config });
+      toast.success("Configuration updated");
+      setConfigModal((p) => ({ ...p, open: false }));
+      load();
+    } catch (e) { toast.error(e.message); }
+    finally { setInstalling(null); }
+  };
+
+  const validateConfig = async () => {
+    try {
+      await integrationMarketplaceService.validate(configModal.provider, { config: configModal.data });
+      toast.success("Configuration is valid!");
+    } catch (e) { toast.error(e.message); }
   };
   const sync = async (id) => {
     try { await integrationMarketplaceService.sync(id); toast.success("Sync started"); load(); }
@@ -50,6 +87,31 @@ const Integrations = () => {
 
       {loading ? <UptoSpinner /> : (
         <>
+          {configModal.open && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+              <UptoCard className="w-full max-w-md">
+                <UptoSectionHeading label={`${configModal.isEdit ? 'Edit' : 'Connect'} Integration`} darkMode={darkMode} />
+                <div className="space-y-4">
+                  {configModal.fields.map(f => (
+                    <UptoInput 
+                      key={f.key} 
+                      label={f.label} 
+                      type={f.type || 'text'} 
+                      value={configModal.data[f.key] || ''} 
+                      onChange={(e) => setConfigModal(p => ({...p, data: {...p.data, [f.key]: e.target.value}}))} 
+                    />
+                  ))}
+                  <div className="flex justify-end gap-2 pt-4">
+                    <UptoButton variant="secondary" onClick={() => setConfigModal(p => ({...p, open: false}))}>Cancel</UptoButton>
+                    <UptoButton variant="secondary" onClick={validateConfig}><CheckCircle2 className="h-4 w-4 mr-1" /> Validate</UptoButton>
+                    <UptoButton onClick={() => configModal.isEdit ? updateConfig(configModal.provider, configModal.data) : install(configModal.provider, configModal.data)}>
+                      {configModal.isEdit ? 'Save' : 'Connect'}
+                    </UptoButton>
+                  </div>
+                </div>
+              </UptoCard>
+            </div>
+          )}
           <section>
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
               <UptoCard><p className={`text-xs uppercase ${s.subtext}`}>Connected</p><p className={`mt-1 text-2xl font-bold ${s.heading}`}>{items.filter((i) => i.installed).length}</p></UptoCard>
@@ -90,7 +152,7 @@ const Integrations = () => {
                       </div>
                     ) : (
                       isAdmin && (
-                        <UptoButton variant="secondary" onClick={() => install(i.id)} disabled={installing === i.id} className="w-full">
+                        <UptoButton variant="secondary" onClick={() => handleConnectClick(i.id)} disabled={installing === i.id} className="w-full">
                           {installing === i.id ? "Connecting..." : <><Plus className="h-4 w-4" /> Connect</>}
                         </UptoButton>
                       )

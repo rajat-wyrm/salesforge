@@ -119,10 +119,10 @@ const test = asyncHandler(async (req, res) => {
     where: { id: Number(req.params.id), orgId: req.orgId },
   });
   if (!webhook) throw new AppError("Webhook not found.", 404);
-  const { dispatch } = require("../services/webhookService");
+  const { deliverOnce } = require("../services/webhookService");
   const event = "INTEGRATION_SYNCED";
   const payload = { message: "Test event from SalesForge", at: new Date().toISOString() };
-  const result = await dispatch({ orgId: req.orgId, event, payload });
+  const result = await deliverOnce(webhook, event, payload);
   return response.success(res, { ok: result.ok, status: result.status, error: result.error, durationMs: result.durationMs });
 });
 
