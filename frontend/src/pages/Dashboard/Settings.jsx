@@ -62,51 +62,125 @@ const Audit = () => {
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const limit = 30;
 
-  const load = async (p = page) => {
-    setLoading(true);
-    try {
-      const r = await auditService.list({ page: p, limit });
-      setItems(r.items || []);
-      setTotal(r.total || 0);
-    } catch (e) { setError(e.message); }
-    finally { setLoading(false); }
-  };
-  useEffect(() => { load(1); }, []);
+const load = async (p = page, keyword = search) => {
+  try {
+    if (items.length === 0) {
+      setLoading(true);
+    }
+
+    const r = await auditService.list({
+      page: p,
+      limit,
+      search: keyword,
+    });
+
+    console.log("Audit response:", r);
+
+    setItems(r.items || []);
+    setTotal(r.total || 0);
+    setError(null);
+  } catch (error) {
+    console.error("Failed to load audit logs:", error);
+    setError(error.message || "Failed to load audit logs.");
+  } finally {
+    setLoading(false);
+  }
+
+};
+
+useEffect(() => {
+    const timer = setTimeout(() => {
+        load(1, search.trim());
+    }, 500);
+
+    return () => clearTimeout(timer);
+}, [search]);
   if (loading && items.length === 0) return <UptoSpinner />;
   if (error) return <UptoError error={error} onRetry={() => load(1)} />;
 
   return (
     <UptoPage>
       <UptoHero title="Audit log" subtitle={`${total} events recorded`} darkMode={darkMode} />
+      <div className="mb-4">
+  <div className="flex gap-2">
+    <UptoInput
+      placeholder="Search by username or email..."
+      value={search}
+      onChange={(e) => {
+        setSearch(e.target.value);
+        setPage(1);
+      }}
+    />
+
+    {search && (
+      <UptoButton
+        variant="secondary"
+        onClick={() => {
+          setSearch("");
+          setPage(1);
+        }}
+      >
+        Clear
+      </UptoButton>
+    )}
+  </div>
+</div>
       <UptoCard>
         {items.length === 0 ? (
-          <UptoEmptyState icon={Shield} title="No audit events yet" body="Activity will appear here as you and your team use UptoSkills." />
+         <UptoEmptyState
+    icon={Shield}
+    title={
+        search
+            ? "No matching audit records"
+            : "No audit events yet"
+    }
+    body={
+        search
+            ? "Try another user name or email."
+            : "Activity will appear here as you and your team use UptoSkills."
+    }
+/>
         ) : (
           <ul className={`divide-y ${s.divider}`}>
             {items.map((row) => (
               <li key={row.id} className="flex items-center justify-between py-2 text-sm">
-                <div>
-                  <p className={`font-medium ${s.heading}`}>{row.action}</p>
-                  <p className={`text-xs ${s.muted}`}>{row.user?.name || "System"} · {row.entityType} {row.entityId || ""}</p>
-                </div>
-                <div className="text-right text-xs text-slate-500">
-                  <p>{new Date(row.createdAt).toLocaleString()}</p>
-                  {row.ipAddress && <p>{row.ipAddress}</p>}
-                </div>
-              </li>
+  <div>
+    <p className={`font-medium ${s.heading}`}>
+      {row.user?.name || "System"} performed {row.action}
+    </p>
+
+    <p className={`text-xs ${s.muted}`}>
+      <strong>{row.user?.name || "System"}</strong>
+
+      {row.user?.email && <> ({row.user.email})</>}
+
+      {" • "}
+
+      {row.entityType}
+
+      {row.entityId && ` #${row.entityId}`}
+    </p>
+  </div>
+
+  <div className="text-right text-xs text-slate-500">
+    <p>{new Date(row.createdAt).toLocaleString()}</p>
+    {row.ipAddress && <p>{row.ipAddress}</p>}
+  </div>
+</li>
             ))}
           </ul>
         )}
       </UptoCard>
       {total > limit && (
         <div className="mt-4 flex items-center justify-center gap-2">
-          <UptoButton variant="secondary" disabled={page === 1} onClick={() => { const p = page - 1; setPage(p); load(p); }}>Previous</UptoButton>
+          <UptoButton variant="secondary" disabled={page === 1} onClick={() => { const p = page - 1; setPage(p); load(p, search);; }}>Previous</UptoButton>
           <span className={`text-xs ${s.subtext}`}>Page {page} of {Math.ceil(total / limit)}</span>
-          <UptoButton variant="secondary" disabled={page * limit >= total} onClick={() => { const p = page + 1; setPage(p); load(p); }}>Next</UptoButton>
+          <UptoButton variant="secondary" disabled={page * limit >= total} onClick={() => { const p = page + 1; setPage(p); load(p, search); }}>Next</UptoButton>
         </div>
       )}
     </UptoPage>
