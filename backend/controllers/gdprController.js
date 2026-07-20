@@ -42,6 +42,11 @@ const deleteAccount = asyncHandler(async (req, res) => {
     prisma.session.deleteMany({ where: { userId: user.id } }),
     prisma.apiKey.deleteMany({ where: { userId: user.id } }),
     prisma.user.delete({ where: { id: user.id } }),
+    prisma.teamInvite.deleteMany({ where: { invitedById: user.id } }),
+    prisma.lead.updateMany({ where: { addedById: user.id }, data: { addedById: null } }),
+    prisma.lead.updateMany({ where: { assignedToId: user.id }, data: { assignedToId: null } }),
+    prisma.product.updateMany({ where: { userId: user.id }, data: { userId: null } }),
+    prisma.priceBook.updateMany({ where: { userId: user.id }, data: { userId: null } }),
   ]);
   return response.success(res, { message: "Account deleted." });
 });

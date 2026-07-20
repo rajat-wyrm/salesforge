@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { tokenStore } from "@/lib/api";
 import { changelogService, onboardingService, notificationPrefService, gdprService } from "@/services";
 import { useUptoStyles, UptoPage, UptoHero, UptoSectionHeading, UptoButton, UptoBadge, UptoSpinner, UptoError, UptoEmptyState, UptoCard } from "@/components/UI/UptoHooks";
 import { Sparkles, Mail, Bell, Smartphone, Download, Trash2, Check, Star, Zap, Shield, Wrench } from "lucide-react";
@@ -191,8 +192,17 @@ const DataExport = () => {
     const password = prompt("Enter your password to confirm deletion:");
     if (!password) return;
     if (!confirm("This will permanently delete your account and all data. Continue?")) return;
-    try { await gdprService.deleteAccount(password); toast.success("Account deleted"); await logout(); navigate("/"); }
-    catch (e) { toast.error(e.message); }
+    console.log('Deleting account with token:', tokenStore.get());
+    try {
+      await gdprService.deleteAccount(password);
+      toast.success("Account deleted");
+      await logout();
+      navigate("/");
+    }
+    catch (e) {
+      console.error('Delete account error:', e);
+      toast.error(e.message);
+    }
   };
   return (
     <UptoPage>

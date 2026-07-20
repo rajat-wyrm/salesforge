@@ -1,6 +1,5 @@
 
-import { api, unwrap, unwrapList } from "../lib/api";
-
+import { api, unwrap, unwrapList, tokenStore } from "../lib/api";
 export const leadService = {
   list: (params) => unwrapList(api.get("/leads", { params })),
   stats: () => unwrap(api.get("/leads/stats")),
@@ -288,8 +287,11 @@ export const changelogService = {
 };
 
 export const gdprService = {
-  exportUrl: () => `${api.defaults.baseURL}/gdpr/export`,
-  deleteAccount: (password) => unwrap(api.delete("/auth/me", { data: { password, confirmation: "DELETE" } })),
+  exportUrl: () => {
+    const token = tokenStore.get();
+    return `${api.defaults.baseURL}/gdpr/export${token ? `?token=${encodeURIComponent(token)}` : ""}`;
+  },
+  deleteAccount: (password) => unwrap(api.post("/auth/delete-account", { password, confirmation: "DELETE" })),
 };
 
 export const productService = {

@@ -72,14 +72,21 @@ const Tickets = () => {
       setTotal(res?.total || 0);
       setPages(res?.pages || 1);
       setError(null);
-    } catch (e) { setError(e?.message || "Failed to load"); }
-    finally { setLoading(false); }
+    } catch (e) {
+      setError(e?.message || "Failed to load");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { load(1); }, []);
+  useEffect(() => {
+    load(1);
+  }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => { load(1); }, 300);
+    const timer = setTimeout(() => {
+      load(1);
+    }, 300);
     return () => clearTimeout(timer);
   }, [filters.search, filters.status, filters.priority]);
 
@@ -91,13 +98,12 @@ const Tickets = () => {
       setShowCreate(false);
       setDraft({ subject: "", description: "", priority: "medium" });
       load(1);
-    } catch (err) { toast.error(err?.message || "Create failed"); }
+    } catch (err) {
+      toast.error(err?.message || "Create failed");
+    }
   };
 
   const handleStatus = async (id, status) => {
-<<<<<<< HEAD
-    try { await ticketService.update(id, { status }); load(); } catch (_) { }
-=======
     try {
       await ticketService.update(id, { status });
       toast.success(`Ticket ${statusLabels[status]}`);
@@ -105,8 +111,9 @@ const Tickets = () => {
       if (selectedTicket?.id === id) {
         setSelectedTicket((prev) => ({ ...prev, status }));
       }
-    } catch { toast.error("Failed to update status"); }
->>>>>>> Feature-3
+    } catch {
+      toast.error("Failed to update status");
+    }
   };
 
   const handleComment = async (e) => {
@@ -118,7 +125,9 @@ const Tickets = () => {
       setComment("");
       const updated = await ticketService.get(selectedTicket.id);
       setSelectedTicket(updated);
-    } catch (err) { toast.error(err?.message || "Failed to add comment"); }
+    } catch (err) {
+      toast.error(err?.message || "Failed to add comment");
+    }
   };
 
   const openDetail = async (ticket) => {
@@ -149,7 +158,10 @@ const Tickets = () => {
             <p className={`text-base ${subtext}`}>Customer support and help desk</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <UptoButton onClick={() => { setDraft({ subject: "", description: "", priority: "medium" }); setShowCreate(true); }}>
+            <UptoButton onClick={() => {
+              setDraft({ subject: "", description: "", priority: "medium" });
+              setShowCreate(true);
+            }}>
               <Plus className="h-4 w-4" /> New Ticket
             </UptoButton>
           </div>
@@ -168,28 +180,35 @@ const Tickets = () => {
 
       <div className={`rounded-2xl border p-5 ${card} mb-6`}>
         <div className="flex flex-wrap items-end gap-3">
-          <div className="min-w-[200px] flex-1">
+          <div className="min-w-[200px] flex-1 relative">
+            <Search className={`absolute left-2.5 top-2.5 h-4 w-4 ${subtext}`} />
             <input
               placeholder="Search tickets..."
               value={filters.search}
               onChange={(e) => setFilters((p) => ({ ...p, search: e.target.value }))}
               className={`w-full rounded-xl border px-3 py-2 pl-9 text-sm ${inputBg}`}
             />
-            <Search className={`relative -top-7 left-2.5 h-4 w-4 ${subtext}`} />
           </div>
-          <UptoSelect label="Status" value={filters.status}
+          <UptoSelect
+            label="Status"
+            value={filters.status}
             onChange={(e) => setFilters((p) => ({ ...p, status: e.target.value }))}
           >
             <option value="">All</option>
             {STATUSES.map((s) => <option key={s} value={s}>{statusLabels[s]}</option>)}
           </UptoSelect>
-          <UptoSelect label="Priority" value={filters.priority}
+          <UptoSelect
+            label="Priority"
+            value={filters.priority}
             onChange={(e) => setFilters((p) => ({ ...p, priority: e.target.value }))}
           >
             <option value="">All</option>
             {PRIORITIES.map((p) => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
           </UptoSelect>
-          <UptoButton variant="ghost" onClick={() => { setFilters({ search: "", status: "", priority: "" }); load(1); }}>
+          <UptoButton variant="ghost" onClick={() => {
+            setFilters({ search: "", status: "", priority: "" });
+            load(1);
+          }}>
             <RotateCcw className="h-4 w-4" /> Reset
           </UptoButton>
         </div>
@@ -200,7 +219,12 @@ const Tickets = () => {
       {loading ? (
         <UptoSpinner />
       ) : items.length === 0 ? (
-        <UptoEmptyState icon={Ticket} title="No tickets found" body="Create a ticket to track customer issues." action={<UptoButton onClick={() => setShowCreate(true)}><Plus className="h-4 w-4" /> New Ticket</UptoButton>} />
+        <UptoEmptyState
+          icon={Ticket}
+          title="No tickets found"
+          body="Create a ticket to track customer issues."
+          action={<UptoButton onClick={() => setShowCreate(true)}><Plus className="h-4 w-4" /> New Ticket</UptoButton>}
+        />
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -212,14 +236,22 @@ const Tickets = () => {
               >
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2 text-xs">
-                    <UptoBadge tone={priorityColors[t.priority] || "default"}>{priorityLabels[t.priority] || t.priority}</UptoBadge>
+                    <UptoBadge tone={priorityColors[t.priority] || "default"}>
+                      {priorityLabels[t.priority] || t.priority}
+                    </UptoBadge>
                     <span className={subtext}>{t.number || `#${t.id}`}</span>
                   </div>
-                  <UptoBadge tone={statusColors[t.status] || "default"}>{statusLabels[t.status]}</UptoBadge>
+                  <UptoBadge tone={statusColors[t.status] || "default"}>
+                    {statusLabels[t.status]}
+                  </UptoBadge>
                 </div>
-                <h3 className={`font-semibold mb-1.5 line-clamp-1 ${heading}`}>{t.subject || t.title}</h3>
+                <h3 className={`font-semibold mb-1.5 line-clamp-1 ${heading}`}>
+                  {t.subject || t.title}
+                </h3>
                 {t.description && (
-                  <p className={`text-sm line-clamp-2 mb-3 ${body}`}>{t.description}</p>
+                  <p className={`text-sm line-clamp-2 mb-3 ${body}`}>
+                    {t.description}
+                  </p>
                 )}
                 <div className={`flex items-center justify-between text-xs ${subtext}`}>
                   <span>{new Date(t.createdAt).toLocaleDateString()}</span>
@@ -232,23 +264,17 @@ const Tickets = () => {
               </div>
             ))}
           </div>
-const handleStatus = async (id, status) => {
-  try {
-    await ticketService.update(id, { status });
-    toast.success(`Ticket ${statusLabels[status]}`);
-    load(page);
-    if (selectedTicket?.id === id) {
-      setSelectedTicket((prev) => ({ ...prev, status }));
-    }
-  } catch {
-    toast.error("Failed to update status");
-  }
-};
+
+          {/* Pagination - Add if needed */}
+          {pages > 1 && (
+            <div className="flex justify-center gap-2 mt-6">
+              {/* Add pagination controls here */}
             </div>
           )}
         </>
       )}
 
+      {/* Create Ticket Modal */}
       {showCreate && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setShowCreate(false)}>
           <form onSubmit={handleCreate} onClick={(e) => e.stopPropagation()} className={`w-full max-w-lg rounded-2xl p-6 ${darkMode ? "bg-slate-900 border border-slate-800" : "bg-white"}`}>
@@ -259,9 +285,26 @@ const handleStatus = async (id, status) => {
               </button>
             </div>
             <div className="space-y-4">
-              <UptoInput label="Subject" value={draft.subject} onChange={(e) => setDraft({ ...draft, subject: e.target.value })} required placeholder="Brief summary of the issue" />
-              <UptoTextarea label="Description" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} required placeholder="Detailed description..." rows={4} />
-              <UptoSelect label="Priority" value={draft.priority} onChange={(e) => setDraft({ ...draft, priority: e.target.value })}>
+              <UptoInput
+                label="Subject"
+                value={draft.subject}
+                onChange={(e) => setDraft({ ...draft, subject: e.target.value })}
+                required
+                placeholder="Brief summary of the issue"
+              />
+              <UptoTextarea
+                label="Description"
+                value={draft.description}
+                onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+                required
+                placeholder="Detailed description..."
+                rows={4}
+              />
+              <UptoSelect
+                label="Priority"
+                value={draft.priority}
+                onChange={(e) => setDraft({ ...draft, priority: e.target.value })}
+              >
                 {PRIORITIES.map((p) => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
               </UptoSelect>
             </div>
@@ -273,6 +316,7 @@ const handleStatus = async (id, status) => {
         </div>
       )}
 
+      {/* Ticket Detail Modal */}
       {selectedTicket && (
         <div className="fixed inset-0 bg-black/40 flex items-start justify-center z-50 p-4 overflow-y-auto" onClick={() => setSelectedTicket(null)}>
           <div onClick={(e) => e.stopPropagation()} className={`w-full max-w-2xl mt-10 mb-10 rounded-2xl p-6 md:p-8 ${darkMode ? "bg-slate-900 border border-slate-800" : "bg-white"}`}>
@@ -280,10 +324,16 @@ const handleStatus = async (id, status) => {
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2 mb-2">
                   <span className={`text-xs font-mono ${subtext}`}>{selectedTicket.number || `#${selectedTicket.id}`}</span>
-                  <UptoBadge tone={statusColors[selectedTicket.status] || "default"}>{statusLabels[selectedTicket.status]}</UptoBadge>
-                  <UptoBadge tone={priorityColors[selectedTicket.priority] || "default"}>{priorityLabels[selectedTicket.priority] || selectedTicket.priority}</UptoBadge>
+                  <UptoBadge tone={statusColors[selectedTicket.status] || "default"}>
+                    {statusLabels[selectedTicket.status]}
+                  </UptoBadge>
+                  <UptoBadge tone={priorityColors[selectedTicket.priority] || "default"}>
+                    {priorityLabels[selectedTicket.priority] || selectedTicket.priority}
+                  </UptoBadge>
                 </div>
-                <h2 className={`text-xl md:text-2xl font-semibold ${heading}`}>{selectedTicket.subject || selectedTicket.title}</h2>
+                <h2 className={`text-xl md:text-2xl font-semibold ${heading}`}>
+                  {selectedTicket.subject || selectedTicket.title}
+                </h2>
               </div>
               <button type="button" onClick={() => setSelectedTicket(null)} className={`shrink-0 rounded-lg p-1.5 ${subtext} hover:bg-slate-100 dark:hover:bg-slate-800 transition`}>
                 <X className="h-5 w-5" />
@@ -291,7 +341,9 @@ const handleStatus = async (id, status) => {
             </div>
 
             <div className={`rounded-xl border p-4 mb-6 ${card}`}>
-              <p className={`text-sm whitespace-pre-wrap ${body}`}>{selectedTicket.description || "No description provided."}</p>
+              <p className={`text-sm whitespace-pre-wrap ${body}`}>
+                {selectedTicket.description || "No description provided."}
+              </p>
               <div className={`mt-4 pt-4 border-t flex flex-wrap gap-4 text-xs ${darkMode ? "border-slate-800 text-slate-400" : "border-slate-200 text-slate-500"}`}>
                 <span>Created: {new Date(selectedTicket.createdAt).toLocaleString()}</span>
                 {selectedTicket.updatedAt && <span>Updated: {new Date(selectedTicket.updatedAt).toLocaleString()}</span>}
@@ -308,7 +360,9 @@ const handleStatus = async (id, status) => {
               </div>
             )}
 
-            <div className={`mb-4 font-semibold text-sm ${heading}`}>Comments ({selectedTicket.comments?.length || 0})</div>
+            <div className={`mb-4 font-semibold text-sm ${heading}`}>
+              Comments ({selectedTicket.comments?.length || 0})
+            </div>
 
             <div className="space-y-3 mb-6">
               {(selectedTicket.comments?.length > 0) ? (

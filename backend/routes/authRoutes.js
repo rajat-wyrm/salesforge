@@ -35,6 +35,7 @@ router.post("/forgot-password", validate(forgotPasswordSchema), forgotPassword);
 router.post("/reset-password", validate(resetPasswordSchema), resetPassword);
 router.post("/change-password", protect, validate(changePasswordSchema), changePassword);
 router.delete("/me", protect, deleteAccount);
+router.post("/delete-account", protect, deleteAccount);
 router.get("/me", protect, me);
 router.post("/send-otp", validate(otpEmailSchema), sendOtp);
 router.post("/verify-otp", validate(verifyOtpSchema), verifyOtp);
