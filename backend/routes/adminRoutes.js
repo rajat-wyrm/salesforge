@@ -10,5 +10,6 @@ router.get("/dashboard", protect, isAdmin, ctrl.getDashboardSummary);
 router.get("/users", protect, isAdmin, ctrl.listAllUsers);
 router.patch("/users/:id", protect, isAdmin, ctrl.updateUser);
 router.get("/platform-stats", protect, isAdmin, ctrl.getPlatformStats);
+router.post("/system-event", protect, isAdmin, ctrl.triggerSystemEvent);
 
 module.exports = router;

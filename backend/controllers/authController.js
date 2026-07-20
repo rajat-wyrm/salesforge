@@ -3,7 +3,7 @@ const crypto = require("crypto");
 const { OAuth2Client } = require("google-auth-library");
 
 const { prisma } = require("../config/postgres");
-const { createNotification } = require("../services/notificationService");
+const { createInAppNotification } = require("../services/notificationService");
 const generateToken = require("../utils/generateToken");
 const { sendResetEmail, sendVerificationEmail, sendEmail } = require("../utils/sendEmail");
 const asyncHandler = require("../utils/asyncHandler");
@@ -166,9 +166,11 @@ const register = asyncHandler(async (req, res) => {
     });
   }
 
-  await createNotification({
+  await createInAppNotification({
     userId: user.id,
+    orgId: user.organizationId,
     type: "WELCOME",
+    category: "system",
     message: "Your account is ready to use.",
     link: "/app/dashboard",
   });
@@ -210,10 +212,12 @@ const login = asyncHandler(async (req, res) => {
     ipAddress: req.ip,
     userAgent: req.headers["user-agent"],
   });
-  await createNotification({
+  await createInAppNotification({
     userId: user.id,
+    orgId: user.organizationId,
     type: "LOGIN",
-    message: "You signed in successfully.",
+    category: "system",
+    message: "Login alert: New sign-in detected.",
     link: "/app/dashboard",
   });
   await recordAudit({
@@ -265,9 +269,11 @@ const resetPassword = asyncHandler(async (req, res) => {
   });
   // Invalidate all existing sessions on password change.
   await prisma.session.deleteMany({ where: { userId: updated.id } });
-  await createNotification({
+  await createInAppNotification({
     userId: updated.id,
+    orgId: updated.organizationId,
     type: "PASSWORD_RESET",
+    category: "system",
     message: "Your password was changed successfully.",
     link: "/app/settings",
   });

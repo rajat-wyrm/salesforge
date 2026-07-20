@@ -1,7 +1,7 @@
 const dns = require("dns").promises;
 const { prisma } = require("../config/postgres");
 const { AppError } = require("../middleware/errorHandler");
-const { createNotification } = require("../services/notificationService");
+const { createInAppNotification } = require("../services/notificationService");
 const { recordAudit } = require("../services/auditService");
 const { incrementUsage } = require("../services/usageService");
 const { publish } = require("../services/webhookService");
@@ -65,9 +65,11 @@ const domainSearch = asyncHandler(async (req, res) => {
     data: { userId: req.user.id, orgId: req.orgId, type: "DOMAIN_SEARCH", resource: "domain" },
   });
   await incrementUsage({ userId: req.user.id, orgId: req.orgId, resource: "searches" });
-  await createNotification({
+  await createInAppNotification({
     userId: req.user.id,
+    orgId: req.orgId,
     type: "DOMAIN_SEARCH",
+    category: "system",
     message: `Domain lookup completed for ${domain}.`,
     link: "/app/search/domain",
     metadata: { status, recordId: record.id, ip },

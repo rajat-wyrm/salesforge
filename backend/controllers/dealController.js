@@ -1,5 +1,6 @@
 const { prisma } = require("../config/postgres");
 const { AppError } = require("../middleware/errorHandler");
+const { createInAppNotification } = require("../services/notificationService");
 const asyncHandler = require("../utils/asyncHandler");
 const response = require("../utils/response");
 const { recordAudit } = require("../services/auditService");
@@ -164,6 +165,15 @@ const createDeal = asyncHandler(async (req, res) => {
   });
   await recordAudit({ userId: req.user.id, orgId: req.orgId, action: "deal.create", entityType: "Deal", entityId: deal.id, metadata: { amount, title } });
   await publish({ orgId: req.orgId, event: "DEAL_CREATED", payload: { dealId: deal.id, title, amount } });
+  await createInAppNotification({
+    userId: req.user.id,
+    orgId: req.orgId,
+    type: "DEAL_CREATED",
+    category: "deal",
+    message: `New deal "${title}" created ($${amount}).`,
+    link: `/app/deals/${deal.id}`,
+    metadata: { dealId: deal.id }
+  });
   return response.created(res, deal);
 });
 
@@ -197,6 +207,19 @@ const updateDeal = asyncHandler(async (req, res) => {
   const updated = await prisma.deal.update({ where: { id: deal.id }, data, include: { stageRef: true } });
   await recordAudit({ userId: req.user.id, orgId: req.orgId, action: "deal.update", entityType: "Deal", entityId: deal.id, metadata: data });
   await publish({ orgId: req.orgId, event: "DEAL_UPDATED", payload: { dealId: deal.id } });
+  
+  if (req.body.stageId !== undefined && deal.stageId !== req.body.stageId) {
+    await createInAppNotification({
+      userId: req.user.id,
+      orgId: req.orgId,
+      type: "DEAL_UPDATED",
+      category: "deal",
+      message: `Deal "${updated.title}" moved to ${updated.stageRef.name}.`,
+      link: `/app/deals/${updated.id}`,
+      metadata: { dealId: updated.id }
+    });
+  }
+
   return response.success(res, updated);
 });
 

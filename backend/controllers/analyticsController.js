@@ -2,7 +2,6 @@ const { prisma } = require("../config/postgres");
 const asyncHandler = require("../utils/asyncHandler");
 const response = require("../utils/response");
 const { AppError } = require("../middleware/errorHandler");
-const { createNotification } = require("../services/notificationService");
 const { recordAudit } = require("../services/auditService");
 const { publish } = require("../services/webhookService");
 

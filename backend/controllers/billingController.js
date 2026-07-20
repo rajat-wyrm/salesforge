@@ -3,6 +3,7 @@ const { AppError } = require("../middleware/errorHandler");
 const asyncHandler = require("../utils/asyncHandler");
 const response = require("../utils/response");
 const { getPlan, currentPeriod, checkLimit } = require("../utils/planLimits");
+const { createInAppNotification } = require("../services/notificationService");
 const crypto = require("crypto");
 const Razorpay = require("razorpay");
 
@@ -80,6 +81,16 @@ const activatePlan = async ({ userId, orgId, plan, interval, price, paymentRef }
       },
     });
   }
+
+  await createInAppNotification({
+    userId,
+    orgId,
+    type: "BILLING_UPDATE",
+    category: "billing",
+    message: `Your workspace has been upgraded to ${plan}.`,
+    link: "/app/settings/billing",
+  });
+
   return sub;
 };
 
@@ -136,10 +147,28 @@ const verifyPayment = asyncHandler(async (req, res) => {
     .digest("hex");
 
   if (expectedSignature !== razorpay_signature) {
+    await createInAppNotification({
+      userId: req.user.id,
+      orgId: req.orgId,
+      type: "PAYMENT_FAILED",
+      category: "billing",
+      message: `Payment failed or could not be verified.`,
+      link: "/app/settings/billing",
+    });
     throw new AppError("Payment verification failed. Signature mismatch.", 400);
   }
 
   const sub = await activatePlan({ userId: req.user.id, orgId: req.orgId, plan, interval, price, paymentRef: razorpay_payment_id });
+
+  await createInAppNotification({
+    userId: req.user.id,
+    orgId: req.orgId,
+    type: "PAYMENT_RECEIVED",
+    category: "billing",
+    message: `Payment of $${price} received successfully.`,
+    link: "/app/settings/billing",
+  });
+
   return response.success(res, { subscription: sub, charged: price });
 });
 
@@ -188,4 +217,28 @@ const usage = asyncHandler(async (req, res) => {
   return response.success(res, { period, plan, usage: summary });
 });
 
-module.exports = { getCurrentSubscription, listPlans, createOrder, verifyPayment, cancel, listPayments, usage, PLAN_PRICING };
+const createInvoice = asyncHandler(async (req, res) => {
+  const { amount = 99 } = req.body;
+  const invoice = await prisma.invoice.create({
+    data: {
+      orgId: req.orgId,
+      amount: Number(amount),
+      status: "DRAFT",
+      dueAt: new Date(Date.now() + 30 * 86400000),
+      number: `INV-${Date.now()}`,
+    }
+  });
+
+  await createInAppNotification({
+    userId: req.user.id,
+    orgId: req.orgId,
+    type: "INVOICE_CREATED",
+    category: "billing",
+    message: `New invoice #${invoice.number} created for $${amount}.`,
+    link: "/app/settings/billing",
+  });
+
+  return response.created(res, invoice);
+});
+
+module.exports = { getCurrentSubscription, listPlans, createOrder, verifyPayment, cancel, listPayments, usage, createInvoice, PLAN_PRICING };

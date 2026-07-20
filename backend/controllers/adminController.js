@@ -4,7 +4,7 @@ const { AppError } = require("../middleware/errorHandler");
 const asyncHandler = require("../utils/asyncHandler");
 const response = require("../utils/response");
 const generateToken = require("../utils/generateToken");
-const { createNotification } = require("../services/notificationService");
+const { createInAppNotification } = require("../services/notificationService");
 const { recordAudit } = require("../services/auditService");
 //  //
 
@@ -34,9 +34,11 @@ const adminLogin = asyncHandler(async (req, res) => {
     const ok = await bcrypt.compare(req.body.password, user.password);
     if (!ok) throw new AppError("Invalid admin credentials.", 401);
   }
-  await createNotification({
+  await createInAppNotification({
     userId: user.id,
+    orgId: user.organizationId,
     type: "ADMIN_LOGIN",
+    category: "system",
     message: "Administrator login successful.",
     link: "/admin/dashboard",
   }); //
@@ -150,10 +152,37 @@ const getPlatformStats = asyncHandler(async (req, res) => {
   });
 });
 
+const triggerSystemEvent = asyncHandler(async (req, res) => {
+  const { eventType, message } = req.body;
+  if (!["MAINTENANCE_NOTICE", "BACKUP_COMPLETED"].includes(eventType)) {
+    throw new AppError("Invalid event type.", 400);
+  }
+
+  // To simulate a system-wide broadcast, we notify the current admin
+  // or we could loop through all users in req.orgId. For performance in this demo,
+  // we will just notify the admin who triggered it, or all users in the org if needed.
+  // We'll fetch all users in the organization to notify them.
+  const users = await prisma.user.findMany({ where: { organizationId: req.orgId }, select: { id: true } });
+  
+  for (const user of users) {
+    await createInAppNotification({
+      userId: user.id,
+      orgId: req.orgId,
+      type: eventType,
+      category: "system",
+      message: message || (eventType === "MAINTENANCE_NOTICE" ? "System maintenance scheduled." : "System backup completed successfully."),
+      link: "/app/dashboard",
+    });
+  }
+
+  return response.success(res, { message: `Triggered ${eventType} for ${users.length} users.` });
+});
+
 module.exports = {
   adminLogin,
   getDashboardSummary,
   listAllUsers,
   updateUser,
   getPlatformStats,
+  triggerSystemEvent,
 };

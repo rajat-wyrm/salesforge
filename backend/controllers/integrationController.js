@@ -3,7 +3,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const response = require("../utils/response");
 const { AppError } = require("../middleware/errorHandler");
 const { recordAudit } = require("../services/auditService");
-const { createNotification } = require("../services/notificationService");
+const { createInAppNotification } = require("../services/notificationService");
 const { recordActivity } = require("../services/leadActivityService");
 const { publish } = require("../services/webhookService");
 const { incrementUsage } = require("../services/usageService");
@@ -55,9 +55,11 @@ const importFromIntegration = asyncHandler(async (req, res) => {
     metadata: results,
   });
   await publish({ orgId: req.orgId, event: "INTEGRATION_SYNCED", payload: { provider, ...results } });
-  await createNotification({
+  await createInAppNotification({
     userId: req.user.id,
+    orgId: req.orgId,
     type: "INTEGRATION_SYNCED",
+    category: "system",
     message: `${provider} import: ${results.created} created, ${results.updated} updated.`,
     link: "/app/leads",
     metadata: { provider, results },

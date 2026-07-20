@@ -1,7 +1,7 @@
 const { prisma } = require("../config/postgres");
 const intelService = require("../services/intelService");
 const { AppError } = require("../middleware/errorHandler");
-const { createNotification } = require("../services/notificationService");
+const { createInAppNotification } = require("../services/notificationService");
 const { recordAudit } = require("../services/auditService");
 const { incrementUsage } = require("../services/usageService");
 const { publish } = require("../services/webhookService");
@@ -45,9 +45,11 @@ const searchIntel = asyncHandler(async (req, res) => {
   await incrementUsage({ userId: req.user.id, orgId: req.orgId, resource: "searches" });
 
   // 4. Send notification
-  await createNotification({
+  await createInAppNotification({
     userId: req.user.id,
+    orgId: req.orgId,
     type: "INTEL_SEARCH",
+    category: "system",
     message: `Intelligence search on "${query}" via ${module} completed.`,
     link: `/tools/intel?module=${module}&q=${encodeURIComponent(query)}`,
     metadata: { recordId: historyItem.id, module, query }
