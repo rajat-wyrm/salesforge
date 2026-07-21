@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { FaSun, FaMoon } from "react-icons/fa";
 import { useTheme } from "../../../context/ThemeContext";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 // ── Reusable Toggle ──────────────────────────────────────────────────────────
 const Toggle = ({ label, description, state, setState, dark }) => {
@@ -67,9 +68,11 @@ const Toggle = ({ label, description, state, setState, dark }) => {
 };
 
 // ── Main Component ────────────────────────────────────────────────────────────
+
 const Notifications = () => {
   const { theme, toggleTheme } = useTheme();
   const dark = theme === "dark";
+  const { requestPermissionAndSubscribe } = usePushNotifications(0);
 
   const [emailNotif,     setEmailNotif]     = useState(true);
   const [smsNotif,       setSmsNotif]       = useState(false);
@@ -92,7 +95,10 @@ const Notifications = () => {
   const toggleItems = [
     { label: "Email Notifications",  description: "Receive updates and alerts via email",   state: emailNotif,     setState: setEmailNotif },
     { label: "SMS Notifications",    description: "Get texts for critical account activity", state: smsNotif,       setState: setSmsNotif },
-    { label: "Push Notifications",   description: "Browser and mobile push alerts",          state: pushNotif,      setState: setPushNotif },
+    { label: "Push Notifications",   description: "Browser and mobile push alerts",          state: pushNotif,      setState: (val) => {
+      setPushNotif(val);
+      if (val) requestPermissionAndSubscribe();
+    }},
     { label: "Marketing Emails",     description: "Product news, tips, and offers",          state: marketingNotif, setState: setMarketingNotif },
   ];
 

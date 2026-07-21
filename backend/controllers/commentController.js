@@ -4,6 +4,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const response = require("../utils/response");
 const { recordAudit } = require("../services/auditService");
 const eventBus = require("../services/eventBus");
+const { dispatchNotification } = require("../services/notificationService");
 
 const VALID_ENTITIES = ["LEAD", "DEAL", "ACTIVITY", "TASK", "NOTE"];
 
@@ -50,11 +51,16 @@ const create = asyncHandler(async (req, res) => {
   // Notify mentioned users.
   for (const handle of mentions) {
     const user = await prisma.user.findFirst({ where: { name: { contains: handle, mode: "insensitive" }, organizationId: req.orgId } });
-    if (user) {
-      await prisma.notification.create({
-        data: { userId: user.id, type: "MENTION", message: `${req.user.name} mentioned you in a comment`, link: `/${entityType.toLowerCase()}/${entityId}`, metadata: { entityType, entityId, commentId: comment.id } },
+    if (user && user.id !== req.user.id) {
+      await dispatchNotification({
+        userId: user.id,
+        orgId: req.orgId,
+        type: "MENTION",
+        category: "team",
+        message: `${req.user.name} mentioned you in a comment.`,
+        link: `/${entityType.toLowerCase()}/${entityId}`,
+        metadata: { entityType, entityId, commentId: comment.id },
       });
-      eventBus.publish(`user:${user.id}`, { event: "notification.new", payload: { type: "MENTION" }, at: new Date().toISOString() });
     }
   }
   return response.created(res, comment);

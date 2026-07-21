@@ -29,6 +29,7 @@ const Calls = () => {
 
   const handleCreate = async (e) => {
     e.preventDefault();
+    
     try {
       await callService.create({ ...draft, duration: Number(draft.duration) });
       toast.success("Call logged");
@@ -72,7 +73,34 @@ const Calls = () => {
             <div className="space-y-3">
               <UptoInput label="Title" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} required />
               <UptoInput label="Phone number" value={draft.phoneNumber} onChange={(e) => setDraft({ ...draft, phoneNumber: e.target.value })} />
-              <UptoInput label="Duration (min)" type="number" value={draft.duration} onChange={(e) => setDraft({ ...draft, duration: e.target.value })} />
+          <UptoInput
+  label="Duration (min)"
+  type="number"
+  min={0}
+  step="1"
+  value={draft.duration}
+  onChange={(e) => {
+    const value = e.target.value;
+
+    if (value === "") {
+      setDraft((p) => ({
+        ...p,
+        duration: "",
+      }));
+      return;
+    }
+
+    const num = Number(value);
+
+    if (num < 0) return;
+
+    setDraft((p) => ({
+      ...p,
+      duration: num,
+    }));
+  }}
+/>
+
               <UptoInput label="Notes" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
             </div>
             <div className="mt-4 flex justify-end gap-2">

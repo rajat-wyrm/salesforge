@@ -102,45 +102,119 @@ const get = asyncHandler(async (req, res) => {
   if (!result) throw new AppError("Lead not found.", 404);
   return response.success(res, { leadId: Number(req.params.leadId), ...result });
 });
-
 const recompute = asyncHandler(async (req, res) => {
-  const result = await computeHealthScore(req.orgId, Number(req.params.leadId));
-  if (!result) throw new AppError("Lead not found.", 404);
-  // Store in Organization's JSON customFields
-  const org = await prisma.organization.findFirst({ where: { id: req.orgId } });
-  if (org) {
-    const cf = org.customFields || {};
-    const healthScores = cf.healthScores || {};
-    healthScores[req.params.leadId] = { ...result, computedAt: new Date() };
-    await prisma.organization.update({
-      where: { id: org.id },
-      data: { customFields: { ...cf, healthScores } },
-    });
+  const leadId = Number(req.params.leadId);
+
+  if (!Number.isInteger(leadId) || leadId <= 0) {
+    throw new AppError("Invalid lead ID.", 400);
   }
-  return response.success(res, result);
+
+  const lead = await prisma.lead.findFirst({
+    where: {
+      id: leadId,
+      orgId: req.orgId,
+    },
+    select: {
+      id: true,
+      scoreDetails: true,
+    },
+  });
+
+  if (!lead) {
+    throw new AppError("Lead not found.", 404);
+  }
+
+  const result = await computeHealthScore(req.orgId, leadId);
+
+  if (!result) {
+    throw new AppError("Unable to calculate health score.", 400);
+  }
+
+  const existingScoreDetails =
+    lead.scoreDetails &&
+    typeof lead.scoreDetails === "object" &&
+    !Array.isArray(lead.scoreDetails)
+      ? lead.scoreDetails
+      : {};
+
+  const computedAt = new Date().toISOString();
+
+  await prisma.lead.update({
+    where: {
+      id: lead.id,
+    },
+    data: {
+      scoreDetails: {
+        ...existingScoreDetails,
+        healthScore: {
+          ...result,
+          computedAt,
+        },
+      },
+    },
+  });
+
+  return response.success(res, {
+    leadId,
+    ...result,
+    computedAt,
+  });
 });
+
 
 const analytics = asyncHandler(async (req, res) => {
   const leads = await prisma.lead.findMany({ where: { orgId: req.orgId }, select: { id: true } });
-  let healthy = 0, atRisk = 0, critical = 0;
-  let totalScore = 0;
+
+let healthy = 0;
+let atRisk = 0;
+let critical = 0;
+let totalScore = 0;
+
+const distribution = {
+  "0-20": 0,
+  "21-40": 0,
+  "41-60": 0,
+  "61-80": 0,
+  "81-100": 0,
+};
+
+
   for (const lead of leads) {
     const result = await computeHealthScore(req.orgId, lead.id);
-    if (result) {
-      totalScore += result.score;
-      if (result.score >= 70) healthy++;
-      else if (result.score >= 40) atRisk++;
-      else critical++;
+    if (!result) continue;
+
+    totalScore += result.score;
+
+    if (result.score >= 70) {
+      healthy++;
+    } else if (result.score >= 40) {
+      atRisk++;
+    } else {
+      critical++;
+    }
+
+    if (result.score <= 20) {
+      distribution["0-20"]++;
+    } else if (result.score <= 40) {
+      distribution["21-40"]++;
+    } else if (result.score <= 60) {
+      distribution["41-60"]++;
+    } else if (result.score <= 80) {
+      distribution["61-80"]++;
+    } else {
+      distribution["81-100"]++;
     }
   }
+
   const avgScore = leads.length > 0 ? Math.round(totalScore / leads.length) : 0;
+
   return response.success(res, {
     total: leads.length,
-    healthy, atRisk, critical,
+    healthy,
+    atRisk,
+    critical,
     avgScore,
-    distribution: {
-      "0-20": leads.filter((l) => true).length, // simplified
-    },
+    distribution,
   });
 });
 

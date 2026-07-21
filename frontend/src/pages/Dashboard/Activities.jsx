@@ -45,6 +45,11 @@ const Activities = () => {
   };
   const create = async (e) => {
     e.preventDefault();
+    if (!draft.title.trim()) {
+  toast.error("Title is required");
+  return;
+
+}
     try { await activityService.create(draft); toast.success("Activity created"); setShowCreate(false); setDraft({ kind: "CALL", entityType: "LEAD", entityId: 1, title: "", dueAt: "", description: "" }); load(); }
     catch (err) { toast.error(err.message); }
   };
@@ -164,14 +169,14 @@ const Activities = () => {
               </UptoSelect>
               <UptoInput label="Title *" value={draft.title} onChange={(e) => setDraft((p) => ({ ...p, title: e.target.value }))} required />
               <UptoTextarea label="Description" rows={2} value={draft.description} onChange={(e) => setDraft((p) => ({ ...p, description: e.target.value }))} />
-              <UptoInput label="Due at" type="datetime-local" value={draft.dueAt} onChange={(e) => setDraft((p) => ({ ...p, dueAt: e.target.value }))} />
+              <UptoInput label="Due at" type="datetime-local" max="3000-12-31T23:59" value={draft.dueAt} onChange={(e) => {   const value = e.target.value; if (value) { const date = new Date(value); if (!isNaN(date.getTime()) && date.getFullYear() > 3000) { toast.error("Year cannot be greater than 3000"); return; } } setDraft((p) => ({ ...p, dueAt: value, })); }}/>
               <UptoSelect label="Entity type" value={draft.entityType} onChange={(e) => setDraft((p) => ({ ...p, entityType: e.target.value }))}>
                 <option value="LEAD">Lead</option>
                 <option value="DEAL">Deal</option>
                 <option value="CONTACT">Contact</option>
                 <option value="COMPANY">Company</option>
               </UptoSelect>
-              <UptoInput label="Entity ID" type="number" value={draft.entityId} onChange={(e) => setDraft((p) => ({ ...p, entityId: Number(e.target.value) }))} />
+              <UptoInput label="Entity ID" type="number" min={1} step="1" value={draft.entityId} onChange={(e) => { const value = e.target.value; if (value === "") { setDraft((p) => ({ ...p, entityId: "", })); return; } const num = Number(value); if (num < 1) return; setDraft((p) => ({ ...p, entityId: num, })); }}/>
               <div className="flex gap-2">
                 <UptoButton type="submit">Create</UptoButton>
                 <UptoButton type="button" variant="secondary" onClick={() => setShowCreate(false)}>Cancel</UptoButton>
@@ -185,3 +190,4 @@ const Activities = () => {
 };
 
 export default Activities;
+

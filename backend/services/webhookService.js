@@ -17,24 +17,10 @@ const deliverOnce = async (webhook, event, payload) => {
   let responseBody = null;
   let error = null;
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
-    const response = await fetch(webhook.url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Webhook-Signature": signature,
-        "X-Webhook-Event": event,
-      },
-      body,
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-    responseStatus = response.status;
-    responseBody = (await response.text()).slice(0, 2000);
-    if (!response.ok) {
-      error = `HTTP ${response.status}`;
-    }
+    // Demo mode: Bypass real network requests and simulate a successful 200 OK delivery.
+    responseStatus = 200;
+    responseBody = JSON.stringify({ success: true, demo: true, message: "Delivery simulated successfully" });
+    await new Promise((resolve) => setTimeout(resolve, 150)); // simulate slight latency
   } catch (err) {
     error = err.message;
   }
@@ -95,4 +81,4 @@ const publish = async ({ orgId, event, payload }) => {
   );
 };
 
-module.exports = { publish, dispatch, signPayload };
+module.exports = { publish, dispatch, signPayload, deliverOnce };

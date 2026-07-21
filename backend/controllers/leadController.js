@@ -1,5 +1,5 @@
 const { prisma } = require("../config/postgres");
-const { createNotification } = require("../services/notificationService");
+const { dispatchNotification } = require("../services/notificationService");
 const { updateLeadScore } = require("../services/leadScoringService");
 const { recordActivity, diffLead, summarizeChanges } = require("../services/leadActivityService");
 const asyncHandler = require("../utils/asyncHandler");
@@ -83,9 +83,14 @@ const createLead = asyncHandler(async (req, res) => {
   });
   await updateLeadScore(lead.id);
   const updated = await prisma.lead.findUnique({ where: { id: lead.id }, include: LEAD_INCLUDE });
-  await createNotification({
-    userId: req.user.id,
+  
+  // Notify the assigned owner (if any), otherwise notify the creator
+  const targetUserId = lead.ownerId ? lead.ownerId : req.user.id;
+  await dispatchNotification({
+    userId: targetUserId,
+    orgId: req.orgId,
     type: "LEAD_CREATED",
+    category: "lead",
     message: `Lead ${lead.name} added to your pipeline.`,
     link: `/app/leads/${lead.id}`,
     metadata: { leadId: lead.id },
@@ -215,6 +220,22 @@ const updateLead = asyncHandler(async (req, res) => {
     metadata: { fields: changes.map((c) => c.field) },
   });
   await publish({ orgId: req.orgId, event: "LEAD_UPDATED", payload: { leadId: lead.id } });
+
+  if (changes.length > 0) {
+    const targetUserId = lead.ownerId ? lead.ownerId : req.user.id;
+    // Don't notify the user if they made the change themselves, unless they are the only one to notify
+    if (targetUserId !== req.user.id || !lead.ownerId) {
+      await dispatchNotification({
+        userId: targetUserId,
+        orgId: req.orgId,
+        type: "LEAD_UPDATED",
+        category: "lead",
+        message: `Lead ${lead.name} was updated by ${req.user.name}.`,
+        link: `/app/leads/${lead.id}`,
+        metadata: { leadId: lead.id, changes: changes.map(c => c.field) },
+      });
+    }
+  }
 
   const refreshed = await prisma.lead.findUnique({ where: { id: lead.id }, include: LEAD_INCLUDE });
   return response.success(res, refreshed);

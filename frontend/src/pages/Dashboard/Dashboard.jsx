@@ -6,29 +6,45 @@ import { UptoError as ErrorBanner, UptoSpinner as FullPageSpinner, UptoBadge as 
 import { Activity, BarChart3, TrendingUp, Users, Target, Search, MailCheck, Globe2, Link2, Sparkles, AlertCircle, Zap, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 const Dashboard = () => {
   const { theme } = useTheme();
   const darkMode = theme === "dark";
   const navigate = useNavigate();
+  usePushNotifications(0);
   const [data, setData] = useState(null);
   const [usage, setUsage] = useState(null);
   const [insights, setInsights] = useState([]);
   const [error, setError] = useState(null);
+  const [secondaryError, setSecondaryError] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
     setLoading(true);
     setError(null);
+    setSecondaryError(null);
     try {
-      const [global, ins, us] = await Promise.all([
+      const [globalResult, insightsResult, usageResult] = await Promise.allSettled([
         analyticsService.global(),
         analyticsService.insights(),
         usageService.summary(),
       ]);
-      setData(global);
-      setInsights(ins.insights || []);
-      setUsage(us);
+
+      // The overview is the only required request. Optional widgets must not
+      // turn the whole dashboard into an error screen when one service is down.
+      if (globalResult.status === "rejected") throw globalResult.reason;
+
+      setData(globalResult.value);
+      setInsights(insightsResult.status === "fulfilled" ? insightsResult.value.insights || [] : []);
+      setUsage(usageResult.status === "fulfilled" ? usageResult.value : null);
+
+      const unavailable = [];
+      if (insightsResult.status === "rejected") unavailable.push("AI insights");
+      if (usageResult.status === "rejected") unavailable.push("plan usage");
+      if (unavailable.length) {
+        setSecondaryError(`${unavailable.join(" and ")} ${unavailable.length === 1 ? "is" : "are"} temporarily unavailable.`);
+      }
     } catch (e) {
       setError(e.message || "Failed to load dashboard");
     } finally {
@@ -60,6 +76,7 @@ const Dashboard = () => {
 
   return (
     <UptoPage>
+      {secondaryError && <ErrorBanner error={secondaryError} onRetry={load} />}
       {/* Hero section matching Maindashboard */}
       <div className="relative overflow-hidden -mx-6 md:-mx-10 lg:-mx-16 px-6 md:px-10 lg:px-16 py-12 md:py-16">
         <div className="absolute inset-0 pointer-events-none">

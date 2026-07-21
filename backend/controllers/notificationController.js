@@ -35,6 +35,7 @@ const readAllNotifications = asyncHandler(async (req, res) => {
 
 const broadcast = asyncHandler(async (req, res) => {
   // Admin/owner can send a notification to themselves or other org members.
+  // createNotification already publishes `notification.new` via SSE for each recipient.
   const { userIds = [req.user.id], type = "INFO", message, link = null, metadata = {} } = req.body;
   if (!message) return response.error(res, "message is required", 400);
   await Promise.all(
@@ -42,9 +43,6 @@ const broadcast = asyncHandler(async (req, res) => {
       createNotification({ userId: Number(id), type, message, link, metadata }),
     ),
   );
-  for (const id of userIds) {
-    eventBus.publish(`user:${Number(id)}`, { event: "notification.new", payload: { type, message }, at: new Date().toISOString() });
-  }
   return response.success(res, { sent: userIds.length });
 });
 

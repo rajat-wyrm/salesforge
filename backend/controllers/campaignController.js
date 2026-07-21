@@ -32,7 +32,18 @@ const get = asyncHandler(async (req, res) => {
 });
 
 const create = asyncHandler(async (req, res) => {
-  const { name, description, type = "email", status = "draft", segment, content, schedule, budget } = req.body;
+  const {
+  name,
+  description,
+  subject,
+  audience,
+  type = "email",
+  status = "draft",
+  segment,
+  content,
+  schedule,
+  budget,
+} = req.body;
   if (!name) throw new AppError("name is required.", 400);
   // WorkflowTrigger enum: use "SCHEDULED_TIME" as the default campaign trigger.
   // Store the campaign type inside the conditions JSON object.
@@ -42,7 +53,14 @@ const create = asyncHandler(async (req, res) => {
       userId: req.user.id,
       name, description: description || null,
       trigger: "SCHEDULED_TIME",
-      conditions: { segment: segment || null, type, schedule: schedule || null, budget: budget || null },
+      conditions: {
+  segment: segment || null,
+  subject: subject || "",
+  audience: audience || "all",
+  type,
+  schedule: schedule || null,
+  budget: budget || null,
+},
       actions: content || [{ type: "SEND_EMAIL" }],
       active: status === "running",
     },
@@ -53,20 +71,42 @@ const create = asyncHandler(async (req, res) => {
 });
 
 const update = asyncHandler(async (req, res) => {
-  const { name, description, status, segment, content, budget } = req.body;
+  const {
+  name,
+  description,
+  subject,
+  audience,
+  status,
+  segment,
+  content,
+  budget,
+} = req.body;
   const campaign = await prisma.workflow.findFirst({ where: { id: Number(req.params.id), orgId: req.orgId } });
   if (!campaign) throw new AppError("Campaign not found.", 404);
   const data = {};
   if (name !== undefined) data.name = name;
   if (description !== undefined) data.description = description;
   if (status !== undefined) data.active = status === "running";
-  if (segment !== undefined || budget !== undefined) {
-    // Merge into existing conditions JSON
-    const existingConditions = (typeof campaign.conditions === "object" && campaign.conditions) ? campaign.conditions : {};
-    if (segment !== undefined) existingConditions.segment = segment;
-    if (budget !== undefined) existingConditions.budget = budget;
-    data.conditions = existingConditions;
-  }
+  if (
+  segment !== undefined ||
+  budget !== undefined ||
+  subject !== undefined ||
+  audience !== undefined
+) {
+  const existingConditions =
+    (typeof campaign.conditions === "object" && campaign.conditions)
+      ? campaign.conditions
+      : {};
+  if (segment !== undefined)
+    existingConditions.segment = segment;
+  if (budget !== undefined)
+    existingConditions.budget = budget;
+  if (subject !== undefined)
+    existingConditions.subject = subject;
+  if (audience !== undefined)
+    existingConditions.audience = audience;
+  data.conditions = existingConditions;
+}
   if (content !== undefined) data.actions = content;
   await prisma.workflow.update({ where: { id: campaign.id }, data });
   invalidateCache("/campaigns");

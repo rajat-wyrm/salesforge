@@ -3,6 +3,7 @@ const { AppError } = require("../middleware/errorHandler");
 const asyncHandler = require("../utils/asyncHandler");
 const response = require("../utils/response");
 const { recordActivity } = require("../services/leadActivityService");
+const { dispatchNotification } = require("../services/notificationService");
 
 const ensureLeadInOrg = async (leadId, orgId) => {
   const lead = await prisma.lead.findFirst({ where: { id: Number(leadId), orgId } });
@@ -60,6 +61,18 @@ const create = asyncHandler(async (req, res) => {
     body: priority ? `Priority: ${priority}` : null,
     metadata: { taskId: task.id, assigneeId: assignee.id },
   });
+
+  if (assignee.id !== req.user.id) {
+    await dispatchNotification({
+      userId: assignee.id,
+      orgId: req.orgId,
+      type: "TASK_ASSIGNED",
+      category: "team",
+      message: `${req.user.name} assigned you a task: "${title}".`,
+      link: `/app/leads/${lead.id}`,
+    });
+  }
+
   return response.created(res, task);
 });
 
@@ -91,6 +104,18 @@ const update = asyncHandler(async (req, res) => {
       title: `${req.user.name} completed a task`,
     });
   }
+
+  if (userId !== undefined && Number(userId) !== req.user.id) {
+    await dispatchNotification({
+      userId: Number(userId),
+      orgId: req.orgId,
+      type: "TASK_ASSIGNED",
+      category: "team",
+      message: `${req.user.name} reassigned a task to you.`,
+      link: `/app/leads/${lead.id}`,
+    });
+  }
+
   return response.success(res, { message: "Task updated." });
 });
 

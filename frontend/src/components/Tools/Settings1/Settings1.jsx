@@ -1,8 +1,15 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "../../../context/AuthContext";
 import { FaSun, FaMoon, FaUser, FaLock, FaGlobe, FaShieldAlt } from "react-icons/fa";
 import { useTheme } from "../../../context/ThemeContext";
+import { userService, notificationPrefService } from "../../../services";
+import { toast } from "sonner";
+
+// Categories the backend tracks preferences for (see notificationPrefController.js).
+// The Settings page exposes a single "Email Notifications" master toggle, so saving
+// it updates the email channel across every category at once.
+const NOTIFICATION_CATEGORIES = ["lead", "deal", "billing", "team", "system"];
 
 // ── Reusable styled toggle pill (matches Notifications style) ────────────────
 const TogglePill = ({ checked, onChange, dark }) => (
@@ -49,7 +56,7 @@ const SectionHeading = ({ icon, label, dark }) => (
 const Settings1 = () => {
   const { theme, toggleTheme } = useTheme();
   const dark = theme === "dark";
-  const { logout } = useAuth();
+  const { user, updateUser, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -61,14 +68,85 @@ const Settings1 = () => {
   const [email,         setEmail]         = useState("");
   const [password,      setPassword]      = useState("");
   const [language,      setLanguage]      = useState("English");
-  const [notifications, setNotifications] = useState(false);
+  const [notifications, setNotifications] = useState(true);
   const [publicprofile, setPublicprofile] = useState(false);
   const [saved,         setSaved]         = useState(false);
+  const [saving,        setSaving]        = useState(false);
   const [focusField,    setFocusField]    = useState("");
+  const [errors,        setErrors]        = useState({});
 
-  const saveSettings = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2200);
+  // Populate Name/Email from the signed-in user once, so the form shows real
+  // data instead of always starting blank. Guarded by a ref so a save (which
+  // refreshes the user in context) doesn't wipe out what's on screen again.
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (user && !initializedRef.current) {
+      setName(user.name || "");
+      setEmail(user.email || "");
+      initializedRef.current = true;
+    }
+  }, [user]);
+
+  // Load the user's real email-notification preference from the backend so the
+  // toggle reflects what is actually saved, instead of always defaulting to off.
+  useEffect(() => {
+    let cancelled = false;
+    notificationPrefService
+      .list()
+      .then((prefs) => {
+        if (cancelled) return;
+        const emailPrefs = (prefs || []).filter((p) => p.channel === "email");
+        const allEnabled = emailPrefs.length > 0 && emailPrefs.every((p) => p.enabled);
+        setNotifications(allEnabled);
+      })
+      .catch(() => {
+        // Keep the current toggle state if preferences can't be loaded.
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const validate = () => {
+    const next = {};
+    if (!name.trim()) next.name = "Full name is required.";
+    else if (name.trim().length < 2) next.name = "Full name must be at least 2 characters.";
+    if (!email.trim()) next.email = "Email is required.";
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
+  const saveSettings = async () => {
+    if (!validate()) {
+      toast.error("Please fix the highlighted fields before saving.");
+      return;
+    }
+    setSaving(true);
+    try {
+      // Only the name is editable/persistable here (the backend's /users/me
+      // endpoint only accepts name + mobile). Update the shared auth context
+      // immediately so the header/sidebar reflect the new name right away.
+      if (user && name.trim() !== user.name) {
+        const updatedUser = await userService.updateMe({ name: name.trim() });
+        updateUser(updatedUser);
+      }
+
+      // Persist the email notification preference for real, across every
+      // category, so the toggle actually controls whether emails go out.
+      await notificationPrefService.update(
+        NOTIFICATION_CATEGORIES.map((category) => ({
+          channel: "email",
+          category,
+          enabled: notifications,
+        }))
+      );
+
+      setSaved(true);
+      toast.success("Settings saved.");
+      setTimeout(() => setSaved(false), 2200);
+    } catch (err) {
+      toast.error(err?.normalized?.message || "Failed to save settings. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   // ── Tokens ───────────────────────────────────────────────────────────────
@@ -90,13 +168,34 @@ const Settings1 = () => {
     borderRadius: 12, outline: "none",
     background: dark ? "#131e32" : "#fff",
     color:  dark ? "#e2e8f0" : "#162944",
-    border: focusField === field
+    border: errors[field]
+      ? "1.6px solid #dc2626"
+      : focusField === field
       ? "1.6px solid rgba(231,105,55,0.65)"
       : dark ? "1.5px solid rgba(255,255,255,0.10)" : "1.5px solid rgba(0,0,0,0.10)",
-    boxShadow: focusField === field ? "0 0 0 4px rgba(231,105,55,0.15)" : "none",
+    boxShadow: errors[field]
+      ? "0 0 0 4px rgba(220,38,38,0.15)"
+      : focusField === field
+      ? "0 0 0 4px rgba(231,105,55,0.15)"
+      : "none",
     transition: "all 200ms ease",
     boxSizing: "border-box",
   });
+
+  // Email can't be changed from this page (the backend only allows updating
+  // name/mobile here), so it's shown read-only instead of pretending to save.
+  const disabledInputStyle = {
+    width: "100%", padding: "12px 16px", fontSize: 15,
+    borderRadius: 12, outline: "none",
+    background: dark ? "#0d1626" : "#eef1f4",
+    color: dark ? "#64748b" : "#94a3b8",
+    border: dark ? "1.5px solid rgba(255,255,255,0.06)" : "1.5px solid rgba(0,0,0,0.06)",
+    cursor: "not-allowed",
+    boxSizing: "border-box",
+  };
+
+  const errorTextStyle = { color: "#dc2626", fontSize: 12, fontWeight: 700, margin: "6px 2px 10px" };
+  const helperTextStyle = { color: subtext, fontSize: 12, margin: "6px 2px 12px" };
 
   const rowStyle = {
     display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -152,14 +251,17 @@ const Settings1 = () => {
           type="text" placeholder="Full Name" value={name}
           onChange={(e) => setName(e.target.value)}
           onFocus={() => setFocusField("name")} onBlur={() => setFocusField("")}
-          style={{ ...inputStyle("name"), marginBottom: 12 }}
+          style={{ ...inputStyle("name"), marginBottom: errors.name ? 0 : 12 }}
         />
+        {errors.name && <p style={errorTextStyle}>{errors.name}</p>}
         <input
           type="email" placeholder="Email" value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          onFocus={() => setFocusField("email")} onBlur={() => setFocusField("")}
-          style={{ ...inputStyle("email"), marginBottom: 4 }}
+          disabled
+          readOnly
+          title="Your email is tied to your account and can't be changed here."
+          style={{ ...disabledInputStyle, marginBottom: 4 }}
         />
+        <p style={helperTextStyle}>Your email is tied to your account and can't be changed here.</p>
 
         {/* ── Password ─────────────────────────────────────────────────── */}
         <SectionHeading icon={<FaLock />} label="Change Password" dark={dark} />
@@ -209,7 +311,8 @@ const Settings1 = () => {
         {/* ── Save ─────────────────────────────────────────────────────── */}
         <button
           onClick={saveSettings}
-          onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; }}
+          disabled={saving}
+          onMouseEnter={(e) => { if (!saving) e.currentTarget.style.transform = "translateY(-2px)"; }}
           onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; }}
           style={{
             width: "100%", padding: "14px 0", marginTop: 24,
@@ -218,20 +321,29 @@ const Settings1 = () => {
               ? "linear-gradient(90deg, #17AA97, #0e8870)"
               : "linear-gradient(90deg, #E76937, #CC4F22)",
             color: "#fff", fontWeight: 800, fontSize: 16,
-            cursor: "pointer", letterSpacing: 0.3,
+            cursor: saving ? "not-allowed" : "pointer", letterSpacing: 0.3,
+            opacity: saving ? 0.75 : 1,
             boxShadow: saved ? "0 8px 24px rgba(23,170,151,0.30)" : "0 8px 24px rgba(231,105,55,0.28)",
             transition: "all 260ms ease",
           }}
         >
-          {saved ? "✓ Settings Saved!" : "Save Settings"}
+          {saving ? "Saving…" : saved ? "✓ Settings Saved!" : "Save Settings"}
         </button>
 
         {/* ── Logout ───────────────────────────────────────────────────── */}
         <button
            type="button"
            onClick={handleLogout}
-           onMouseEnter={(e) => { e.currentTarget.style.background = "#be123c"; }}
-           onMouseLeave={(e) => { e.currentTarget.style.background = dark ? "rgba(239,68,68,0.14)" : "rgba(239,68,68,0.08)"; }}
+           onMouseEnter={(e) => {
+             e.currentTarget.style.background = "#dc2626";
+             e.currentTarget.style.color = "#ffffff";
+             e.currentTarget.style.borderColor = "#dc2626";
+           }}
+           onMouseLeave={(e) => {
+             e.currentTarget.style.background = dark ? "rgba(239,68,68,0.14)" : "rgba(239,68,68,0.08)";
+             e.currentTarget.style.color = dark ? "#fca5a5" : "#dc2626";
+             e.currentTarget.style.borderColor = "rgba(239,68,68,0.35)";
+           }}
            style={{
              width: "100%", padding: "13px 0", marginTop: 12,
              borderRadius: 14,
@@ -239,7 +351,8 @@ const Settings1 = () => {
              background: dark ? "rgba(239,68,68,0.14)" : "rgba(239,68,68,0.08)",
              color: dark ? "#fca5a5" : "#dc2626",
              fontWeight: 700, fontSize: 15, cursor: "pointer",
-             transition: "all 220ms ease", letterSpacing: 0.3,
+             transition: "background 220ms ease, color 220ms ease, border-color 220ms ease",
+             letterSpacing: 0.3,
            }}
          >
            Logout

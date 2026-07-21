@@ -41,6 +41,11 @@ export const orgStore = {
   set: (o) => localStorage.setItem(ORG_KEY, JSON.stringify(o)),
 };
 
+export function clearAuthState() {
+  localStorage.removeItem('authToken');
+  localStorage.removeItem('user');
+}
+
 // Attach the bearer token and a request id to every request.
 api.interceptors.request.use((config) => {
   const token = tokenStore.get();

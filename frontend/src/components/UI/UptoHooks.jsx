@@ -39,35 +39,29 @@ export const UptoSectionHeading = ({ label, darkMode, action = null }) => (
   <div className="mb-7 flex items-end justify-between">
     <div>
       <h2 className={`text-xl font-semibold mb-2 ${darkMode ? "text-white" : "text-slate-900"}`}>{label}</h2>
-      <div className="w-10 h-[3px] bg-linear-to-r from-[#00b5ad] to-[#e76937] rounded-full" />
+      <div className="w-10 h-[3px] bg-gradient-to-r from-[#00b5ad] to-[#e76937] rounded-full" />
     </div>
     {action}
   </div>
 );
 
-export const UptoHero = ({ title, subtitle, darkMode, actions = null }) => {
-  const s = useUptoStyles();
-  const isDark = darkMode ?? s.darkMode;
-
-  return (
-    <div className={`relative overflow-hidden -mx-6 md:-mx-10 lg:-mx-16 rounded-b-3xl border px-6 md:px-10 lg:px-16 py-10 md:py-14 shadow-sm backdrop-blur-sm ${isDark ? "border-slate-800 bg-slate-900/95" : "border-slate-200 bg-white/90"}`}>
-      <div className={`absolute inset-0 pointer-events-none bg-linear-to-r from-[#00b5ad]/10 via-transparent to-[#e76937]/10 ${isDark ? "opacity-80" : "opacity-100"}`} />
-      <div className="absolute inset-0 pointer-events-none">
-        <div className={`absolute top-0 right-0 w-96 h-96 rounded-full blur-3xl ${isDark ? "bg-[#00b5ad]/15" : "bg-[#00b5ad]/10"}`} />
-        <div className={`absolute bottom-0 left-0 w-96 h-96 rounded-full blur-3xl ${isDark ? "bg-[#e76937]/10" : "bg-[#e76937]/8"}`} />
-      </div>
-      <div className="relative flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-        <div>
-          <h1 className={`text-3xl md:text-4xl font-semibold mb-2 leading-tight ${isDark ? "text-white" : "text-slate-900"}`}>{title}</h1>
-          {subtitle && <p className={`text-base ${isDark ? "text-slate-400" : "text-slate-500"}`}>{subtitle}</p>}
-        </div>
-        {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
-      </div>
+export const UptoHero = ({ title, subtitle, darkMode, actions = null }) => (
+  <div className="relative overflow-hidden -mx-6 md:-mx-10 lg:-mx-16 px-6 md:px-10 lg:px-16 py-10 md:py-14">
+    <div className="absolute inset-0 pointer-events-none">
+      <div className={`absolute top-0 right-0 w-96 h-96 rounded-full blur-3xl ${darkMode ? "bg-blue-900/20" : "bg-blue-300/20"}`} />
+      <div className={`absolute bottom-0 left-0 w-96 h-96 rounded-full blur-3xl ${darkMode ? "bg-teal-900/15" : "bg-teal-300/15"}`} />
     </div>
-  );
-};
+    <div className="relative flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+      <div>
+        <h1 className={`text-3xl md:text-4xl font-semibold mb-2 leading-tight ${darkMode ? "text-white" : "text-slate-900"}`}>{title}</h1>
+        {subtitle && <p className={`text-base ${darkMode ? "text-slate-400" : "text-slate-500"}`}>{subtitle}</p>}
+      </div>
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+    </div>
+  </div>
+);
 
-export const UptoButton = ({ as: Component = "button", children, variant = "primary", className = "", ...props }) => {
+export const UptoButton = ({ children, variant = "primary", className = "", ...props }) => {
   const { theme } = useTheme();
   const darkMode = theme === "dark";
   const variants = {
@@ -79,20 +73,21 @@ export const UptoButton = ({ as: Component = "button", children, variant = "prim
     danger: "bg-red-500 text-white hover:bg-red-600 shadow-sm",
   };
   return (
-    <Component
+    <button
       {...props}
       className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]} ${className}`}
     >
       {children}
-    </Component>
+    </button>
   );
 };
 
 export const UptoInput = ({ label, darkMode, ...props }) => {
   const s = useUptoStyles();
+  console.log("UptoInput props:", props);
   return (
     <label className="block">
-      {label && <span className={`mb-1 block text-sm font-medium ${s.darkMode ? "text-slate-300" : "text-slate-700"}`}>{label}</span>}
+      {label && (<span className={`mb-1 block text-sm font-medium ${s.darkMode ? "text-slate-300" : "text-slate-700"}`}>{label}</span>)}
       <input
         {...props}
         className={`w-full rounded-xl border px-3 py-2 text-sm shadow-sm transition focus:border-[#00b5ad] focus:outline-none focus:ring-2 focus:ring-[#00b5ad]/20 ${s.input} ${props.className || ""}`}
@@ -203,6 +198,6 @@ export const UptoCopyButton = ({ value, className = "" }) => {
 
 export const UptoProgressBar = ({ value, max = 100, darkMode }) => (
   <div className={`h-2 w-full overflow-hidden rounded-full ${darkMode ? "bg-slate-800" : "bg-slate-100"}`}>
-    <div className="h-full bg-linear-to-r from-[#00b5ad] to-[#2dd4bf] transition-all" style={{ width: `${Math.max(0, Math.min(100, (value / max) * 100))}%` }} />
+    <div className="h-full bg-gradient-to-r from-[#00b5ad] to-[#2dd4bf] transition-all" style={{ width: `${Math.max(0, Math.min(100, (value / max) * 100))}%` }} />
   </div>
 );

@@ -104,7 +104,7 @@ const searchEntities = async (orgId, query, { limit = 20 } = {}) => {
       orgId,
       OR: [
         { title: { contains: q, mode: "insensitive" } },
-        { body: { contains: q, mode: "insensitive" } },
+        { description: { contains: q, mode: "insensitive" } },
       ],
     },
     take: limit,

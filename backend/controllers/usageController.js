@@ -22,7 +22,11 @@ const summary = asyncHandler(async (req, res) => {
   const limits = getPlan(plan);
   const usage = {};
   for (const resource of Object.keys(limits)) {
-    const used = usageRecords.find((r) => r.resource === resource)?.count || 0;
+    // Sum every matching record for this resource (across all org members),
+    // instead of .find() which only grabbed the first user's count.
+    const used = usageRecords
+      .filter((r) => r.resource === resource)
+      .reduce((sum, r) => sum + r.count, 0);
     usage[resource] = { used, limit: limits[resource] };
   }
   return response.success(res, {

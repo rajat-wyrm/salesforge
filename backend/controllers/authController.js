@@ -3,7 +3,7 @@ const crypto = require("crypto");
 const { OAuth2Client } = require("google-auth-library");
 
 const { prisma } = require("../config/postgres");
-const { createNotification } = require("../services/notificationService");
+const { dispatchNotification } = require("../services/notificationService");
 const generateToken = require("../utils/generateToken");
 const { sendResetEmail, sendVerificationEmail, sendEmail } = require("../utils/sendEmail");
 const asyncHandler = require("../utils/asyncHandler");
@@ -20,7 +20,7 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const SAFE_USER_KEYS = [
   "id", "name", "email", "role", "mobile", "isVerified", "isMobileVerified",
-  "createdAt", "organizationId", "twoFactorEnabled",
+  "createdAt", "organizationId", "twoFactorEnabled", "provider",
 ];
 
 const getSafeUser = (user) => {
@@ -92,30 +92,30 @@ const register = asyncHandler(async (req, res) => {
 
   const user = existing
     ? await prisma.user.update({
-        where: { id: existing.id },
-        data: {
-          name: req.body.name.trim(),
-          email,
-          password,
-          role,
-          organizationId: orgId ?? existing.organizationId,
-          mobile: req.body.mobile || null,
-          isVerified: true,
-          emailVerificationToken: null,
-          emailVerificationExpires: null,
-        },
-      })
+      where: { id: existing.id },
+      data: {
+        name: req.body.name.trim(),
+        email,
+        password,
+        role,
+        organizationId: orgId ?? existing.organizationId,
+        mobile: req.body.mobile || null,
+        isVerified: true,
+        emailVerificationToken: null,
+        emailVerificationExpires: null,
+      },
+    })
     : await prisma.user.create({
-        data: {
-          name: req.body.name.trim(),
-          email,
-          password,
-          role,
-          organizationId: orgId,
-          mobile: req.body.mobile || null,
-          isVerified: true,
-        },
-      });
+      data: {
+        name: req.body.name.trim(),
+        email,
+        password,
+        role,
+        organizationId: orgId,
+        mobile: req.body.mobile || null,
+        isVerified: true,
+      },
+    });
 
   if (orgId) {
     await prisma.orgMembership.upsert({
@@ -166,9 +166,11 @@ const register = asyncHandler(async (req, res) => {
     });
   }
 
-  await createNotification({
+  await dispatchNotification({
     userId: user.id,
+    orgId: user.organizationId,
     type: "WELCOME",
+    category: "system",
     message: "Your account is ready to use.",
     link: "/app/dashboard",
   });
@@ -210,10 +212,12 @@ const login = asyncHandler(async (req, res) => {
     ipAddress: req.ip,
     userAgent: req.headers["user-agent"],
   });
-  await createNotification({
+  await dispatchNotification({
     userId: user.id,
+    orgId: user.organizationId,
     type: "LOGIN",
-    message: "You signed in successfully.",
+    category: "system",
+    message: "Login alert: New sign-in detected.",
     link: "/app/dashboard",
   });
   await recordAudit({
@@ -265,9 +269,11 @@ const resetPassword = asyncHandler(async (req, res) => {
   });
   // Invalidate all existing sessions on password change.
   await prisma.session.deleteMany({ where: { userId: updated.id } });
-  await createNotification({
+  await dispatchNotification({
     userId: updated.id,
+    orgId: updated.organizationId,
     type: "PASSWORD_RESET",
+    category: "system",
     message: "Your password was changed successfully.",
     link: "/app/settings",
   });
@@ -348,57 +354,57 @@ const verifyOtp = asyncHandler(async (req, res) => {
     throw new AppError("The OTP is invalid or has expired.", 400);
   }
   if (
-  !user.emailVerificationExpires ||
-  user.emailVerificationExpires <= new Date()
-) {
-  await prisma.user.update({
+    !user.emailVerificationExpires ||
+    user.emailVerificationExpires <= new Date()
+  ) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerificationToken: null,
+        emailVerificationExpires: null,
+        emailOtpFailedAttempts: 0,
+      },
+    });
+
+    throw new AppError("The OTP is invalid or has expired.", 400);
+  }
+  if (user.emailVerificationToken !== tokenHash) {
+    const attempts = (user.emailOtpFailedAttempts || 0) + 1;
+
+    if (attempts >= 5) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          emailOtpFailedAttempts: 0,
+          emailVerificationToken: null,
+          emailVerificationExpires: null,
+        },
+      });
+
+      throw new AppError(
+        "Too many invalid OTP attempts. Please request a new OTP.",
+        400
+      );
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailOtpFailedAttempts: attempts,
+      },
+    });
+
+    throw new AppError("The OTP is invalid or has expired.", 400);
+  }
+  const updated = await prisma.user.update({
     where: { id: user.id },
     data: {
+      isVerified: true,
       emailVerificationToken: null,
       emailVerificationExpires: null,
       emailOtpFailedAttempts: 0,
     },
   });
-
-  throw new AppError("The OTP is invalid or has expired.", 400);
-}
-if (user.emailVerificationToken !== tokenHash) {
-  const attempts = (user.emailOtpFailedAttempts || 0) + 1;
-
-  if (attempts >= 5) {
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        emailOtpFailedAttempts: 0,
-        emailVerificationToken: null,
-        emailVerificationExpires: null,
-      },
-    });
-
-    throw new AppError(
-      "Too many invalid OTP attempts. Please request a new OTP.",
-      400
-    );
-  }
-
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      emailOtpFailedAttempts: attempts,
-    },
-  });
-
-  throw new AppError("The OTP is invalid or has expired.", 400);
-}
-  const updated = await prisma.user.update({
-  where: { id: user.id },
-  data: {
-    isVerified: true,
-    emailVerificationToken: null,
-    emailVerificationExpires: null,
-    emailOtpFailedAttempts: 0,
-  },
-});
   const isPending = updated.name === "Pending User";
   return response.success(res, {
     token: isPending ? undefined : generateToken(updated),
@@ -409,12 +415,20 @@ if (user.emailVerificationToken !== tokenHash) {
 
 const changePassword = asyncHandler(async (req, res) => {
   const { currentPassword, newPassword } = req.body;
-  if (!currentPassword || !newPassword) throw new AppError("Current and new password are required.", 400);
+  if (!newPassword) throw new AppError("New password is required.", 400);
   const user = await prisma.user.findUnique({ where: { id: req.user.id } });
-  const matches = await bcrypt.compare(currentPassword, user.password);
-  if (!matches) throw new AppError("Current password is incorrect.", 401);
+  // OAuth users (Google etc.) have a random system password they don't know.
+  // Allow them to set a password without providing the current one.
+  const isOAuthUser = !!user.provider;
+  if (!isOAuthUser) {
+    if (!currentPassword) throw new AppError("Current password is required.", 400);
+    const matches = await bcrypt.compare(currentPassword, user.password);
+    if (!matches) throw new AppError("Current password is incorrect.", 401);
+  }
+  if (newPassword.length < 8) throw new AppError("New password must be at least 8 characters.", 400);
   const password = await bcrypt.hash(newPassword, 12);
-  await prisma.user.update({ where: { id: user.id }, data: { password } });
+  // Clear provider so the account can now be used with password login too.
+  await prisma.user.update({ where: { id: user.id }, data: { password, provider: null } });
   await prisma.session.deleteMany({ where: { userId: user.id } });
   await recordAudit({
     userId: user.id,
@@ -443,6 +457,11 @@ const deleteAccount = asyncHandler(async (req, res) => {
   await prisma.$transaction([
     prisma.session.deleteMany({ where: { userId: user.id } }),
     prisma.apiKey.deleteMany({ where: { userId: user.id } }),
+    prisma.teamInvite.deleteMany({ where: { invitedById: user.id } }),
+    prisma.lead.updateMany({ where: { addedById: user.id }, data: { addedById: null } }),
+    prisma.lead.updateMany({ where: { assignedToId: user.id }, data: { assignedToId: null } }),
+    prisma.product.updateMany({ where: { userId: user.id }, data: { userId: null } }),
+    prisma.priceBook.updateMany({ where: { userId: user.id }, data: { userId: null } }),
     prisma.user.delete({ where: { id: user.id } }),
   ]);
   return response.success(res, { message: "Account deleted." });

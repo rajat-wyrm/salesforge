@@ -56,14 +56,25 @@ const getUsage = async (userId, orgId, resource) => {
   });
 };
 
+// Sums usage across every member of the org for this resource + period.
+// Fixes the plan-limit bypass: checking only the current user's own count
+// let each member of a multi-user workspace individually stay under the
+// limit while the org as a whole blew past it.
+const getOrgUsage = async (orgId, resource) => {
+  const period = currentPeriod();
+  const records = await prisma.usageRecord.findMany({
+    where: { orgId: orgId || null, resource, period },
+  });
+  return records.reduce((sum, r) => sum + r.count, 0);
+};
+
 // Middleware factory: enforcePlanLimit("leads", "lead")
 const enforcePlanLimit = (resource, label = resource) => async (req, res, next) => {
   try {
     if (!req.user) return next();
     const orgId = req.user.organizationId;
     const plan = await getOrgPlan(orgId);
-    const usage = await getUsage(req.user.id, orgId, resource);
-    const current = usage?.count || 0;
+    const current = await getOrgUsage(orgId, resource); // org-wide total, not just this user
     const { allowed, limit } = checkLimit(plan, resource, current);
     if (!allowed) {
       return next(
@@ -79,4 +90,4 @@ const enforcePlanLimit = (resource, label = resource) => async (req, res, next) 
   }
 };
 
-module.exports = { incrementUsage, getUsage, getOrgPlan, enforcePlanLimit };
+module.exports = { incrementUsage, getUsage, getOrgUsage, getOrgPlan, enforcePlanLimit };

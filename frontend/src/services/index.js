@@ -1,5 +1,5 @@
-import { api, unwrap, unwrapList } from "../lib/api";
 
+import { api, unwrap, unwrapList, tokenStore } from "../lib/api";
 export const leadService = {
   list: (params) => unwrapList(api.get("/leads", { params })),
   stats: () => unwrap(api.get("/leads/stats")),
@@ -54,7 +54,8 @@ export const teamService = {
 export const billingService = {
   plans: () => unwrap(api.get("/billing/plans")),
   subscription: () => unwrap(api.get("/billing/subscription")),
-  checkout: (data) => unwrap(api.post("/billing/checkout", data)),
+  createOrder: (data) => unwrap(api.post("/billing/razorpay/order", data)),
+  verifyPayment: (data) => unwrap(api.post("/billing/razorpay/verify", data)),
   cancel: () => unwrap(api.post("/billing/cancel")),
   payments: (params) => unwrapList(api.get("/billing/payments", { params })),
   usage: () => unwrap(api.get("/billing/usage")),
@@ -110,6 +111,11 @@ export const notificationService = {
   },
 };
 
+export const userService = {
+  me: () => unwrap(api.get("/users/me")),
+  updateMe: (data) => unwrap(api.patch("/users/me", data)),
+};
+
 export const sessionService = {
   list: () => unwrap(api.get("/sessions")),
   revoke: (id) => unwrap(api.delete(`/sessions/${id}`)),
@@ -153,7 +159,7 @@ export const orgService = {
 };
 
 export const adminService = {
-  login: (email, password) => unwrap(api.post("/admin/login", { email, password })),
+  login: (credential) => unwrap(api.post("/admin/login", { credential })),
   dashboard: () => unwrap(api.get("/admin/dashboard")),
   users: (params) => unwrapList(api.get("/admin/users", { params })),
   updateUser: (id, data) => unwrap(api.patch(`/admin/users/${id}`, data)),
@@ -281,8 +287,11 @@ export const changelogService = {
 };
 
 export const gdprService = {
-  exportUrl: () => `${api.defaults.baseURL}/gdpr/export`,
-  deleteAccount: (password) => unwrap(api.delete("/auth/me", { data: { password, confirmation: "DELETE" } })),
+  exportUrl: () => {
+    const token = tokenStore.get();
+    return `${api.defaults.baseURL}/gdpr/export${token ? `?token=${encodeURIComponent(token)}` : ""}`;
+  },
+  deleteAccount: (password) => unwrap(api.post("/auth/delete-account", { password, confirmation: "DELETE" })),
 };
 
 export const productService = {

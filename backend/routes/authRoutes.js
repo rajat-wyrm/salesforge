@@ -28,11 +28,14 @@ const {
 router.post("/register", validate(registerSchema), register);
 router.post("/login", validate(loginSchema), login);
 router.post("/google", googleLogin);
-router.post("/logout", protect, logout);
+// Logout must remain callable when the cookie is missing or expired so the
+// browser can always clear stale authentication state.
+router.post("/logout", logout);
 router.post("/forgot-password", validate(forgotPasswordSchema), forgotPassword);
 router.post("/reset-password", validate(resetPasswordSchema), resetPassword);
 router.post("/change-password", protect, validate(changePasswordSchema), changePassword);
 router.delete("/me", protect, deleteAccount);
+router.post("/delete-account", protect, deleteAccount);
 router.get("/me", protect, me);
 router.post("/send-otp", validate(otpEmailSchema), sendOtp);
 router.post("/verify-otp", validate(verifyOtpSchema), verifyOtp);

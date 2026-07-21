@@ -40,7 +40,14 @@ const Surveys = () => {
       setShowCreate(false);
       setDraft({ title: "", type: "NPS", question: "" });
       load();
-    } catch (err) { toast.error(err?.message || "Create failed"); }
+    } catch (err) {
+  const message =
+    err?.response?.data?.message ||
+    err?.message ||
+    "Create failed";
+
+  toast.error(message);
+}
   };
 
   return (

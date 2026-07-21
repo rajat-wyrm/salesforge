@@ -1,20 +1,16 @@
 // Sales quotas tracking page.
 import React, { useEffect, useState } from "react";
-import { quotaService, teamService } from "@/services";
+import { quotaService } from "@/services";
 import {
   UptoPage, UptoHero, UptoButton, UptoInput, UptoBadge,
-  UptoSpinner, UptoError, UptoEmptyState, UptoCard, UptoProgressBar, useUptoStyles
+  UptoSpinner, UptoError, UptoEmptyState, UptoCard, UptoProgressBar,
 } from "@/components/UI/UptoHooks";
 import { Target, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { useAuth } from "@/context/AuthContext";
 
 const Quotas = () => {
-  const { user } = useAuth();
-  const s = useUptoStyles();
   const [items, setItems] = useState([]);
   const [metrics, setMetrics] = useState(null);
-  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -23,14 +19,9 @@ const Quotas = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const [list, met, team] = await Promise.all([
-        quotaService.list(), 
-        quotaService.metrics(),
-        teamService.members()
-      ]);
+      const [list, met] = await Promise.all([quotaService.list(), quotaService.metrics()]);
       setItems(list || []);
       setMetrics(met || null);
-      setUsers(team || []);
       setError(null);
     } catch (e) { setError(e?.message || "Failed to load"); }
     finally { setLoading(false); }
@@ -40,6 +31,16 @@ const Quotas = () => {
 
   const handleCreate = async (e) => {
     e.preventDefault();
+if (Number(draft.target) < 0) {
+    toast.error("Target cannot be negative");
+    return;
+  }
+
+  if (!draft.userId.trim()) {
+  toast.error("User ID is required");
+  return;
+}
+
     try {
       await quotaService.create({ ...draft, target: Number(draft.target) });
       toast.success("Quota created");
@@ -61,7 +62,7 @@ const Quotas = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <UptoCard><div className="text-xs text-slate-500">Total target</div><div className="text-2xl font-semibold">${(metrics.totalTarget || 0).toLocaleString()}</div></UptoCard>
           <UptoCard><div className="text-xs text-slate-500">Total actual</div><div className="text-2xl font-semibold">${(metrics.totalActual || 0).toLocaleString()}</div></UptoCard>
-          <UptoCard><div className="text-xs text-slate-500">Attainment</div><div className="text-2xl font-semibold text-[#00b5ad]">{metrics.progress || 0}%</div></UptoCard>
+          <UptoCard><div className="text-xs text-slate-500">Attainment</div><div className="text-2xl font-semibold text-teal-600">{metrics.progress || 0}%</div></UptoCard>
         </div>
       )}
 
@@ -89,23 +90,35 @@ const Quotas = () => {
 
       {showCreate && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <form onSubmit={handleCreate} className={`bg-white dark:bg-slate-900 rounded-2xl p-6 max-w-md w-full ${s.card}`}>
+          <form onSubmit={handleCreate} className="bg-white dark:bg-slate-900 rounded-2xl p-6 max-w-md w-full">
             <h3 className="text-lg font-semibold mb-4">New quota</h3>
             <div className="space-y-3">
-              <div>
-                <label className={`mb-1 block text-sm font-medium ${s.body}`}>User</label>
-                <select
-                  value={draft.userId}
-                  onChange={(e) => setDraft({ ...draft, userId: e.target.value })}
-                  className={`w-full rounded-xl border px-3 py-2 text-sm shadow-sm transition focus:border-[#00b5ad] focus:outline-none focus:ring-2 focus:ring-[#00b5ad]/20 ${s.input}`}
-                >
-                  <option value="">Select a user (default: yourself)</option>
-                  {users.map(u => (
-                    <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
-                  ))}
-                </select>
-              </div>
-              <UptoInput label="Target ($)" type="number" value={draft.target} onChange={(e) => setDraft({ ...draft, target: e.target.value })} required />
+              <UptoInput label="User ID" value={draft.userId} onChange={(e) => setDraft({ ...draft, userId: e.target.value })} required />
+              <UptoInput
+  label="Target"
+  type="number"
+  min={0}
+  step="1"
+  value={draft.target}
+  onChange={(e) => {
+    const value = e.target.value;
+
+    if (value === "") {
+      setDraft({ ...draft, target: "" });
+      return;
+    }
+
+    const num = Number(value);
+
+    if (num < 0) return;
+
+    setDraft({
+      ...draft,
+      target: num,
+    });
+  }}
+  required
+/>
               <UptoInput label="Type" value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value })} />
             </div>
             <div className="mt-4 flex justify-end gap-2">

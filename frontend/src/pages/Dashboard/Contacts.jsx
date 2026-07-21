@@ -1,85 +1,87 @@
-// Generic resource list page template. Used for Contacts page.
+// Contracts page.
 import React, { useEffect, useState } from "react";
-import { contactService } from "@/services";
+import { contractService } from "@/services";
 import {
-  UptoPage, UptoHero, UptoSectionHeading, UptoButton, UptoInput,
-  UptoBadge, UptoSpinner, UptoError, UptoEmptyState, UptoCard,
+  UptoPage, UptoHero, UptoButton, UptoInput, UptoBadge,
+  UptoSpinner, UptoError, UptoEmptyState, UptoCard,
 } from "@/components/UI/UptoHooks";
-import { Users, Plus, Search, Mail, Building2 } from "lucide-react";
+import { FileSignature, Plus } from "lucide-react";
 import { toast } from "sonner";
 
-const Contacts = () => {
+const Contracts = () => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
-  const [draft, setDraft] = useState({ firstName: "", lastName: "", email: "", phone: "", companyId: "", jobTitle: "" });
+  const [draft, setDraft] = useState({ title: "", counterparty: "", value: "", startDate: "", endDate: "" });
 
   const load = async () => {
     setLoading(true);
     try {
-      const res = await contactService.list({ search, limit: 100 });
+      const res = await contractService.list({ limit: 100 });
       setItems(res?.items || res || []);
       setError(null);
-    } catch (e) {
-      setError(e?.message || "Failed to load contacts");
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { setError(e?.message || "Failed to load"); }
+    finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, [search]);
+  useEffect(() => { load(); }, []);
 
   const handleCreate = async (e) => {
     e.preventDefault();
-    try {
-      await contactService.create(draft);
-      toast.success("Contact created");
-      setShowCreate(false);
-      setDraft({ firstName: "", lastName: "", email: "", phone: "", companyId: "", jobTitle: "" });
-      load();
-    } catch (err) {
-      toast.error(err?.message || "Create failed");
+    if (!draft.title.trim()) {
+      toast.error("Title is required");
+      return;
     }
+
+    if (
+      draft.startDate &&
+      draft.endDate &&
+      new Date(draft.endDate) < new Date(draft.startDate)
+    ) {
+      toast.error("End date must be after the start date");
+      return;
+    }
+    try {
+      await contractService.create({ ...draft, value: Number(draft.value) });
+      toast.success("Contract created");
+      setShowCreate(false);
+      setDraft({ title: "", counterparty: "", value: "", startDate: "", endDate: "" });
+      load();
+    } catch (err) { toast.error(err?.message || "Create failed"); }
   };
 
   return (
     <UptoPage>
       <UptoHero
-        title="Contacts"
-        subtitle="People at your customer and prospect companies"
-        actions={<UptoButton onClick={() => setShowCreate(true)}><Plus className="mr-1 h-4 w-4 inline" /> New contact</UptoButton>}
+        title="Contracts"
+        subtitle="Track contract lifecycle and renewals"
+        actions={<UptoButton onClick={() => setShowCreate(true)}><Plus className="mr-1 h-4 w-4 inline" /> New contract</UptoButton>}
       />
-
       <UptoCard>
-        <div className="flex items-center gap-2 mb-4">
-          <Search className="h-4 w-4 text-slate-400" />
-          <UptoInput placeholder="Search contacts..." value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
         {loading && <UptoSpinner />}
         {error && <UptoError message={error} onRetry={load} />}
         {!loading && !error && items.length === 0 && (
-          <UptoEmptyState icon={Users} title="No contacts yet" body="Add your first contact to get started." />
+          <UptoEmptyState icon={FileSignature} title="No contracts" body="Track deals and renewals from this view." />
         )}
         {!loading && !error && items.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-b border-slate-200 dark:border-slate-700 text-left text-xs uppercase text-slate-500">
                 <tr>
-                  <th className="px-3 py-2">Name</th>
-                  <th className="px-3 py-2">Email</th>
-                  <th className="px-3 py-2">Company</th>
+                  <th className="px-3 py-2">Title</th>
+                  <th className="px-3 py-2">Counterparty</th>
+                  <th className="px-3 py-2">Value</th>
                   <th className="px-3 py-2">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((c) => (
                   <tr key={c.id} className="border-b border-slate-100 dark:border-slate-800">
-                    <td className="px-3 py-2 font-medium">{c.firstName} {c.lastName}</td>
-                    <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{c.email || "—"}</td>
-                    <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{c.companyName || "—"}</td>
-                    <td className="px-3 py-2"><UptoBadge>{c.status || "active"}</UptoBadge></td>
+                    <td className="px-3 py-2 font-medium">{c.title}</td>
+                    <td className="px-3 py-2">{c.counterparty || "—"}</td>
+                    <td className="px-3 py-2">${(c.value || 0).toLocaleString()}</td>
+                    <td className="px-3 py-2"><UptoBadge>{c.status || "draft"}</UptoBadge></td>
                   </tr>
                 ))}
               </tbody>
@@ -87,18 +89,89 @@ const Contacts = () => {
           </div>
         )}
       </UptoCard>
-
       {showCreate && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <form onSubmit={handleCreate} className="bg-white dark:bg-slate-900 rounded-2xl p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold mb-4">New contact</h3>
+            <h3 className="text-lg font-semibold mb-4">New contract</h3>
             <div className="space-y-3">
-              <UptoInput label="First name" value={draft.firstName} onChange={(e) => setDraft({ ...draft, firstName: e.target.value })} required />
-              <UptoInput label="Last name" value={draft.lastName} onChange={(e) => setDraft({ ...draft, lastName: e.target.value })} />
-              <UptoInput label="Email" type="email" value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} />
-              <UptoInput label="Phone" value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} />
-              <UptoInput label="Company ID" value={draft.companyId} onChange={(e) => setDraft({ ...draft, companyId: e.target.value })} required />
-              <UptoInput label="Job title" value={draft.jobTitle} onChange={(e) => setDraft({ ...draft, jobTitle: e.target.value })} />
+              <UptoInput label="Title" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} required />
+              <UptoInput label="Counterparty" value={draft.counterparty} onChange={(e) => setDraft({ ...draft, counterparty: e.target.value })} />
+            <UptoInput
+  label="Value"
+  type="number"
+  min={0}
+  step="0.01"
+  value={draft.value}
+  onChange={(e) => {
+    const value = e.target.value;
+
+    if (value === "") {
+      setDraft((p) => ({
+        ...p,
+        value: "",
+      }));
+      return;
+    }
+
+    const num = Number(value);
+
+    if (num < 0) return;
+
+    setDraft((p) => ({
+      ...p,
+      value: num,
+    }));
+  }}
+/>
+
+    <UptoInput
+  label="Start date"
+  type="date"
+  max="3000-12-31"
+  value={draft.startDate}
+  onChange={(e) => {
+    const value = e.target.value;
+
+    if (value) {
+      const date = new Date(value);
+
+      if (!isNaN(date.getTime()) && date.getFullYear() > 3000) {
+        toast.error("Year cannot be greater than 3000");
+        return;
+      }
+    }
+
+    setDraft((p) => ({
+      ...p,
+      startDate: value,
+    }));
+  }}
+/>
+
+    <UptoInput
+  label="End date"
+  type="date"
+  max="3000-12-31"
+  value={draft.endDate}
+  onChange={(e) => {
+    const value = e.target.value;
+
+    if (value) {
+      const date = new Date(value);
+
+      if (!isNaN(date.getTime()) && date.getFullYear() > 3000) {
+        toast.error("Year cannot be greater than 3000");
+        return;
+      }
+    }
+
+    setDraft((p) => ({
+      ...p,
+      endDate: value,
+    }));
+  }}
+/>
+
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <UptoButton type="button" variant="ghost" onClick={() => setShowCreate(false)}>Cancel</UptoButton>
@@ -111,4 +184,4 @@ const Contacts = () => {
   );
 };
 
-export default Contacts;
+export default Contracts;

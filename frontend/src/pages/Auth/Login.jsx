@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { GoogleLogin } from "@react-oauth/google";
 import { Loader2, ArrowLeft, Mail, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -14,6 +14,8 @@ const VIEW = {
 
 const Login = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirect = searchParams.get("redirect") || "/dashboard";
   const { isAuthenticated, loading, refresh } = useAuth();
 
   const [view, setView] = useState(VIEW.GOOGLE);
@@ -26,8 +28,8 @@ const Login = () => {
   const [resetError, setResetError] = useState(null);
 
   useEffect(() => {
-    if (!loading && isAuthenticated) navigate("/dashboard", { replace: true });
-  }, [isAuthenticated, loading, navigate]);
+    if (!loading && isAuthenticated) navigate(redirect, { replace: true });
+  }, [isAuthenticated, loading, navigate, redirect]);
 
   /* ── Google OAuth ─────────────────────────────────────────── */
   const handleGoogleSuccess = async (credentialResponse) => {
@@ -38,8 +40,15 @@ const Login = () => {
         credential: credentialResponse.credential,
       });
       tokenStore.set(res.data.data.token);
-      await refresh();
-      navigate("/dashboard", { replace: true });
+      const authData = await refresh();
+
+      // Role-based redirect: ADMIN users go to admin dashboard
+      const userRole = authData?.user?.role || res.data.data.user?.role;
+      if (userRole === "ADMIN") {
+        navigate("/admin-dashboard", { replace: true });
+      } else {
+        navigate(redirect, { replace: true });
+      }
     } catch (err) {
       const msg =
         err?.response?.data?.message ||

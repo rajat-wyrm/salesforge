@@ -45,9 +45,14 @@ const Calendar = () => {
 
   const create = async (e) => {
     e.preventDefault();
+    if (!draft.title.trim()) {
+    toast.error("Title is required");
+    return;
+    }
+
     try { await calendarService.create(draft); toast.success("Event created"); setShowCreate(false); setDraft({ title: "", description: "", startAt: "", endAt: "", location: "", meetingUrl: "", color: "teal" }); load(); }
     catch (err) { toast.error(err.message); }
-  };
+    };
 
   const monthDays = useMemo(() => {
     if (view !== "month") return [];
@@ -175,8 +180,29 @@ const Calendar = () => {
               <UptoInput label="Title *" value={draft.title} onChange={(e) => setDraft((p) => ({ ...p, title: e.target.value }))} required />
               <UptoTextarea label="Description" value={draft.description} onChange={(e) => setDraft((p) => ({ ...p, description: e.target.value }))} />
               <div className="grid grid-cols-2 gap-3">
-                <UptoInput label="Start *" type="datetime-local" value={draft.startAt} onChange={(e) => setDraft((p) => ({ ...p, startAt: e.target.value }))} required />
-                <UptoInput label="End *" type="datetime-local" value={draft.endAt} onChange={(e) => setDraft((p) => ({ ...p, endAt: e.target.value }))} required />
+                <UptoInput label="Start *"  type="datetime-local" max="3000-12-31T23:59" value={draft.startAt}onChange={(e) => {
+                const value = e.target.value; if (value) {
+                    const date = new Date(value);
+
+                    if (!isNaN(date.getTime()) && date.getFullYear() > 3000) {
+                        toast.error("Year cannot be greater than 3000");
+                        return;
+                    }
+                }
+                     setDraft((p) => ({  ...p, startAt: value, })); }} required />
+          <UptoInput label="End *"  type="datetime-local" max="3000-12-31T23:59" value={draft.endAt}
+                  onChange={(e) => {
+                      const value = e.target.value;
+
+                      if (value) {
+                          const date = new Date(value);
+
+                          if (!isNaN(date.getTime()) && date.getFullYear() > 3000) {
+                              toast.error("Year cannot be greater than 3000");
+                              return;
+                          }
+                      }
+                 setDraft((p) => ({ ...p, endAt: value,}));}} required />
               </div>
               <UptoInput label="Location" value={draft.location} onChange={(e) => setDraft((p) => ({ ...p, location: e.target.value }))} />
               <UptoInput label="Meeting URL" type="url" value={draft.meetingUrl} onChange={(e) => setDraft((p) => ({ ...p, meetingUrl: e.target.value }))} />

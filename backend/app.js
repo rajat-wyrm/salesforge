@@ -77,6 +77,7 @@ const webhookRoutes = require("./routes/webhookRoutes");
 const webhookIncomingRoutes = require("./routes/webhookIncomingRoutes");
 const workflowRoutes = require("./routes/workflowRoutes");
 const chatRoutes = require("./routes/chatRoutes");
+const pushRoutes = require("./routes/pushRoutes");
 
 // Optional feature routes
 let aiRoutes;
@@ -97,6 +98,8 @@ const allowedOrigins = new Set([
   "http://127.0.0.1:5173",
   "http://localhost:5174",
   "http://127.0.0.1:5174",
+  "http://localhost:5175",
+  "http://127.0.0.1:5175",
   "http://localhost:4173",
   "http://127.0.0.1:4173",
 ]);
@@ -173,6 +176,7 @@ app.use("/api/organizations", organizationRoutes);
 app.use("/api/leads", leadRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/push", pushRoutes);
 app.use("/api/email-search", emailSearchRoutes);
 app.use("/api/domain-search", domainSearchRoutes);
 app.use("/api/social-search", socialSearchRoutes);

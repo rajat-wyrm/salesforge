@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { billingService } from "@/services";
 import { useUptoStyles, UptoPage, UptoHero, UptoSectionHeading, UptoButton, UptoBadge, UptoSpinner, UptoError, UptoCard } from "@/components/UI/UptoHooks";
 import { Check, CreditCard, Sparkles, ShieldCheck, Zap, Building2 } from "lucide-react";
@@ -19,24 +19,126 @@ const Billing = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [usageHistory, setUsageHistory] = useState(null);
+  const [paymentHistory, setPaymentHistory] = useState([]);
+  const [payingPlan, setPayingPlan] = useState(null);
+  const paymentSectionRef = useRef(null);
+
+  useEffect(() => {
+    if (payingPlan && paymentSectionRef.current) {
+      paymentSectionRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [payingPlan]);
 
   const load = async () => {
-    setLoading(true);
-    try { setSub(await billingService.subscription()); }
-    catch (e) { setError(e.message); }
-    finally { setLoading(false); }
-  };
+  setLoading(true);
+
+  try {
+    const subscription = await billingService.subscription();
+
+    setSub(subscription);
+
+    try {
+  const usage = await billingService.usage();
+
+  console.log("Usage API Response:", usage);
+
+  setUsageHistory(usage);
+} catch (e) {
+  console.warn("Usage API not available", e);
+}
+
+    try {
+  const payments = await billingService.payments();
+
+  console.log("Payments API Response:", payments);
+
+  setPaymentHistory(payments.items || payments || []);
+} catch (e) {
+  console.warn("Payments API not available", e);
+}
+
+  } catch (e) {
+    setError(e.message);
+  } finally {
+    setLoading(false);
+  }
+};
   useEffect(() => { load(); }, []);
+
+  // Loads the official Razorpay checkout script once. We never build our own
+  // card form — Razorpay's hosted modal handles card/UPI/netbanking securely.
+  const loadRazorpayScript = () => new Promise((resolve) => {
+    if (window.Razorpay) return resolve(true);
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
 
   const checkout = async (plan) => {
     setBusy(true);
+    setPayingPlan(plan);
     try {
-      const result = await billingService.checkout({ plan, interval });
-      if (result.contactSales) { toast.info("Our team will reach out to set up Enterprise."); return; }
-      toast.success(`Subscribed to ${plan} (${interval})`);
-      await load();
-    } catch (e) { toast.error(e.message || "Checkout failed"); }
-    finally { setBusy(false); }
+      const order = await billingService.createOrder({ plan, interval });
+
+      if (order.contactSales) {
+        toast.info("Our team will reach out to set up Enterprise.");
+        setPayingPlan(null);
+        return;
+      }
+      if (order.free) {
+        toast.success(`Switched to ${plan}`);
+        await load();
+        setPayingPlan(null);
+        return;
+      }
+
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        toast.error("Could not load the payment gateway. Check your connection and try again.");
+        setPayingPlan(null);
+        return;
+      }
+
+      const rzp = new window.Razorpay({
+        key: order.keyId,
+        amount: order.amount,
+        currency: order.currency,
+        name: "SalesForge",
+        description: `${plan} plan (${interval})`,
+        order_id: order.orderId,
+        theme: { color: "#00b5ad" },
+        handler: async (resp) => {
+          try {
+            await billingService.verifyPayment({
+              razorpay_order_id: resp.razorpay_order_id,
+              razorpay_payment_id: resp.razorpay_payment_id,
+              razorpay_signature: resp.razorpay_signature,
+              plan, interval,
+            });
+            toast.success(`Subscribed to ${plan} (${interval})`);
+            await load();
+          } catch (e) {
+            toast.error(e.message || "Payment verification failed");
+          } finally {
+            setPayingPlan(null);
+          }
+        },
+        modal: { ondismiss: () => setPayingPlan(null) },
+      });
+      rzp.on("payment.failed", (resp) => {
+        toast.error(resp.error?.description || "Payment failed");
+        setPayingPlan(null);
+      });
+      rzp.open();
+    } catch (e) {
+      toast.error(e.message || "Checkout failed");
+      setPayingPlan(null);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const cancel = async () => {
@@ -57,7 +159,9 @@ const Billing = () => {
         actions={sub && (
           <div className="flex items-center gap-2">
             <UptoBadge tone="brand">Current: {sub.plan}</UptoBadge>
-            {sub.cancelAtPeriodEnd && <UptoBadge tone="warning">Canceling</UptoBadge>}
+            {sub.cancelAtPeriodEnd && sub.status !== "CANCELED" && (
+  <UptoBadge tone="warning">Canceling</UptoBadge>
+)}
           </div>
         )}
       />
@@ -76,12 +180,124 @@ const Billing = () => {
             </UptoCard>
             <UptoCard>
               <p className={`text-xs uppercase ${s.subtext}`}>Status</p>
-              <p className={`text-2xl font-bold ${s.heading}`}>{sub.cancelAtPeriodEnd ? "Pending" : "Active"}</p>
+              <p className={`text-2xl font-bold ${s.heading}`}>{sub.status}</p>
               {!sub.cancelAtPeriodEnd && sub.plan !== "FREE" && (
                 <UptoButton variant="danger" onClick={cancel}>Cancel plan</UptoButton>
               )}
             </UptoCard>
           </div>
+        </section>
+      )}
+      <section>
+  <UptoSectionHeading
+    label="Usage History"
+    darkMode={darkMode}
+  />
+
+  <UptoCard>
+    {usageHistory ? (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+        <div>
+  <p className={s.subtext}>Leads Used</p>
+  <p className={`text-2xl font-bold ${s.heading}`}>
+    {usageHistory.usage?.leads?.used ?? 0}
+  </p>
+</div>
+
+<div>
+  <p className={s.subtext}>Searches</p>
+  <p className={`text-2xl font-bold ${s.heading}`}>
+    {usageHistory.usage?.searches?.used ?? 0}
+  </p>
+</div>
+
+<div>
+  <p className={s.subtext}>Team Members</p>
+  <p className={`text-2xl font-bold ${s.heading}`}>
+    {usageHistory.usage?.teamMembers?.used ?? 0}
+  </p>
+</div>
+
+      </div>
+    ) : (
+      <p className={s.subtext}>No usage data available.</p>
+    )}
+  </UptoCard>
+</section>
+<section>
+  <UptoSectionHeading
+    label="Payment History"
+    darkMode={darkMode}
+  />
+
+  <UptoCard>
+
+    {paymentHistory.length === 0 ? (
+
+      <p className={s.subtext}>
+        No payments found.
+      </p>
+
+    ) : (
+
+      <table className="w-full text-sm">
+
+        <thead>
+          <tr className={s.subtext}>
+            <th className="text-left py-2">Date</th>
+            <th className="text-left py-2">Amount</th>
+            <th className="text-left py-2">Status</th>
+          </tr>
+        </thead>
+
+        <tbody>
+
+          {paymentHistory.map((payment) => (
+
+            <tr
+              key={payment.id}
+              className="border-t"
+            >
+              <td className="py-2">
+                {new Date(payment.createdAt).toLocaleDateString()}
+              </td>
+
+              <td className="py-2">
+                ${payment.amount}
+              </td>
+
+              <td className="py-2">
+                {payment.status}
+              </td>
+
+            </tr>
+
+          ))}
+
+        </tbody>
+
+      </table>
+
+    )}
+
+  </UptoCard>
+</section>
+
+      {payingPlan && (
+        <section ref={paymentSectionRef}>
+          <UptoCard>
+            <div className="flex items-center gap-3">
+              <CreditCard className="h-6 w-6 shrink-0 text-[#00b5ad]" />
+              <div>
+                <p className={`font-semibold ${s.heading}`}>Completing payment for {payingPlan}</p>
+                <p className={`text-sm ${s.subtext}`}>
+                  A secure Razorpay payment window should be open — pay by card, UPI, or netbanking there.
+                  This page will update automatically once your payment is confirmed.
+                </p>
+              </div>
+            </div>
+          </UptoCard>
         </section>
       )}
 

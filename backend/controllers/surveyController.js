@@ -76,17 +76,26 @@ const create = asyncHandler(async (req, res) => {
   if (!name) throw new AppError("name is required.", 400);
   if (!SURVEY_TYPES.includes(type)) throw new AppError(`type must be one of: ${SURVEY_TYPES.join(", ")}`, 400);
 
-  const fallbackLead = await prisma.lead.findFirst({
-    where: { orgId: req.orgId },
-    orderBy: { createdAt: "asc" },
-    select: { id: true },
-  });
-  const leadId = fallbackLead?.id ?? null;
+  
+     const fallbackLead = await prisma.lead.findFirst({
+  where: { orgId: req.orgId },
+  orderBy: { createdAt: "asc" },
+  select: { id: true },
+});
+
+if (!fallbackLead) {
+  throw new AppError(
+    "Please create at least one lead before creating a survey.",
+    400
+  );
+}
+const leadId = fallbackLead.id;    
+
 
   const survey = await prisma.leadActivity.create({
     data: {
       orgId: req.orgId,
-      leadId: leadId ?? 1,
+      leadId: leadId,
       userId: req.user.id,
       type: "SCORE_CHANGED",
       title: name,

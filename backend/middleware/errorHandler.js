@@ -15,7 +15,11 @@ const notFound = (req, res) => {
 };
 
 const errorHandler = (err, req, res, next) => {
-  const statusCode = err.statusCode || 500;
+  const isDatabaseUnavailable =
+    err.code === "P1001" ||
+    err.code === "P1002" ||
+    /(?:can't reach|timed out connecting to) database server/i.test(err.message || "");
+  const statusCode = isDatabaseUnavailable ? 503 : err.statusCode || 500;
 
   // Translate Prisma's machine-oriented errors into stable API responses the frontend can handle cleanly.
   if (err.code === "P2002") {
@@ -43,7 +47,9 @@ const errorHandler = (err, req, res, next) => {
     success: false,
     // Hide raw server errors from clients while still surfacing intentional AppError messages for 4xx cases.
     message:
-      statusCode >= 500
+      isDatabaseUnavailable
+        ? "The data service is temporarily unavailable. Please try again shortly."
+        : statusCode >= 500
         ? "Internal server error."
         : err.message || "Request failed.",
     details:

@@ -5,6 +5,14 @@ import { Package, Plus, Trash2, Edit, DollarSign, Tag, Layers, X } from "lucide-
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 
+
+const currencySymbols = {
+  USD: "$",
+  INR: "₹",
+  EUR: "€",
+  GBP: "£",
+};
+
 const Products = () => {
   const { isMember } = useAuth();
   const s = useUptoStyles();
@@ -32,6 +40,26 @@ const Products = () => {
 
   const create = async (e) => {
     e.preventDefault();
+
+    if (!draft.name.trim()) {
+    toast.error("Product name is required");
+    return;
+    }
+
+    if (!draft.sku.trim()) {
+      toast.error("SKU is required");
+      return;
+    }
+
+    if (draft.unitPrice < 0) {
+      toast.error("Unit Price cannot be negative");
+      return;
+    }
+
+    if (draft.cost < 0) {
+      toast.error("Cost cannot be negative");
+      return;
+    }
     try { await productService.create(draft); toast.success("Product created"); setShowCreate(false); setDraft({ name: "", sku: "", description: "", category: "", unitPrice: 0, cost: 0 }); load(); }
     catch (err) { toast.error(err.message); }
   };
@@ -80,12 +108,16 @@ const Products = () => {
                     <div>
                       <h3 className={`font-semibold ${s.heading}`}>{p.name}</h3>
                       <p className={`text-xs ${s.muted}`}>SKU: {p.sku}</p>
+
                     </div>
                     {p.isActive ? <UptoBadge tone="success">Active</UptoBadge> : <UptoBadge tone="default">Inactive</UptoBadge>}
                   </div>
                   {p.description && <p className={`mb-3 text-sm ${s.body} line-clamp-2`}>{p.description}</p>}
                   <div className="mb-3 flex items-center justify-between">
-                    <span className={`flex items-center gap-1 text-lg font-bold ${s.heading}`}><DollarSign className="h-4 w-4" />{p.unitPrice?.toLocaleString()}</span>
+                    <span className={`text-lg font-bold ${s.heading}`}>
+  {currencySymbols[p.currency] || "$"}{" "}
+  {p.unitPrice?.toLocaleString()}
+</span>
                     {p.category && <UptoBadge tone="info"><Tag className="h-3 w-3" /> {p.category}</UptoBadge>}
                   </div>
                   <div className="flex items-center gap-1">
@@ -127,10 +159,64 @@ const Products = () => {
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <UptoInput label="Name *" value={draft.name} onChange={(e) => setDraft((p) => ({ ...p, name: e.target.value }))} required />
                 <UptoInput label="SKU *" value={draft.sku} onChange={(e) => setDraft((p) => ({ ...p, sku: e.target.value }))} required />
-                <UptoInput label="Unit Price" type="number" value={draft.unitPrice} onChange={(e) => setDraft((p) => ({ ...p, unitPrice: Number(e.target.value) }))} />
-                <UptoInput label="Cost" type="number" value={draft.cost} onChange={(e) => setDraft((p) => ({ ...p, cost: Number(e.target.value) }))} />
+               <UptoInput
+  label="Unit Price"
+  type="number"
+  min={0}
+  step="0.01"
+  value={draft.unitPrice}
+  onChange={(e) => {
+    const value = e.target.value;
+
+    if (value === "") {
+      setDraft((p) => ({ ...p, unitPrice: "" }));
+      return;
+    }
+
+    const num = Number(value);
+
+    if (num < 0) return;
+
+    setDraft((p) => ({
+      ...p,
+      unitPrice: num,
+    }));
+  }}
+/>
+
+<UptoInput
+  label="Cost"
+  type="number"
+  min={0}
+  step="0.01"
+  value={draft.cost}
+  onChange={(e) => {
+    const value = e.target.value;
+
+    if (value === "") {
+      setDraft((p) => ({ ...p, cost: "" }));
+      return;
+    }
+
+    const num = Number(value);
+
+    if (num < 0) return;
+
+    setDraft((p) => ({
+      ...p,
+      cost: num,
+    }));
+  }}
+/>
+
+
                 <UptoInput label="Category" value={draft.category} onChange={(e) => setDraft((p) => ({ ...p, category: e.target.value }))} placeholder="SaaS, Hardware, Service" />
-                <UptoInput label="Currency" value={draft.currency || "USD"} onChange={(e) => setDraft((p) => ({ ...p, currency: e.target.value }))} />
+                <UptoSelect label="Currency" value={draft.currency || "USD"} onChange={(e) =>  setDraft((p) => ({ ...p, currency: e.target.value }))}>
+    <option value="USD">USD</option>
+    <option value="INR">INR</option>
+    <option value="EUR">EUR</option>
+    <option value="GBP">GBP</option>
+</UptoSelect>
               </div>
               <UptoTextarea label="Description" value={draft.description} onChange={(e) => setDraft((p) => ({ ...p, description: e.target.value }))} />
               <div className="flex gap-2">

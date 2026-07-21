@@ -9,9 +9,48 @@ const { recordAudit } = require("../services/auditService");
 // In production, this would connect to a real ML model (TensorFlow, PyTorch, etc.)
 // For now, we use a sophisticated rule-based system that mimics ML behavior.
 
+const MIN_HISTORICAL_LEADS = 10;
+
+// Calculates conversion-rate-based weights from real historical outcomes.
+// Returns null if there isn't enough data yet (cold start) — caller should
+// fall back to default hardcoded scores in that case.
+const getFactorWeights = async (orgId) => {
+  const historicalLeads = await prisma.lead.findMany({
+    where: { orgId, status: { in: ["converted", "lost"] } },
+    select: { status: true, companySize: true, industry: true, source: true },
+  });
+
+  if (historicalLeads.length < MIN_HISTORICAL_LEADS) {
+    return null;
+  }
+
+  const rateByCategory = (field) => {
+    const counts = {};
+    for (const lead of historicalLeads) {
+      const key = lead[field] || "unknown";
+      if (!counts[key]) counts[key] = { converted: 0, total: 0 };
+      counts[key].total += 1;
+      if (lead.status === "converted") counts[key].converted += 1;
+    }
+    const rates = {};
+    for (const key in counts) {
+      rates[key] = counts[key].converted / counts[key].total;
+    }
+    return rates;
+  };
+
+  return {
+    companySize: rateByCategory("companySize"),
+    industry: rateByCategory("industry"),
+    source: rateByCategory("source"),
+  };
+};
+
 const scoreLead = async (orgId, leadId) => {
   const lead = await prisma.lead.findFirst({ where: { id: leadId, orgId } });
   if (!lead) return null;
+
+  const weights = await getFactorWeights(orgId);
 
   const factors = {};
   let score = 0;
@@ -28,10 +67,16 @@ const scoreLead = async (orgId, leadId) => {
   factors.dataCompleteness = { value: completeness, max: 20 };
 
   // 2. Company size signal (0-15 points)
-  const sizeScores = { "1000+": 15, "501-1000": 12, "201-500": 10, "51-200": 7, "11-50": 4, "1-10": 2 };
-  const sizeScore = sizeScores[lead.companySize] || 0;
+  const defaultSizeScores = { "1000+": 15, "501-1000": 12, "201-500": 10, "51-200": 7, "11-50": 4, "1-10": 2 };
+  let sizeScore;
+  if (weights && weights.companySize[lead.companySize || "unknown"] !== undefined) {
+    sizeScore = Math.round(weights.companySize[lead.companySize || "unknown"] * 15);
+  } else {
+    sizeScore = defaultSizeScores[lead.companySize] || 0;
+  }
   score += sizeScore;
   factors.companySize = { value: sizeScore, signal: lead.companySize || "unknown" };
+
 
   // 3. Seniority signal (0-15 points)
   const seniorityScores = { "CEO": 15, "CTO": 14, "CFO": 14, "VP": 12, "Director": 10, "Manager": 7, "Senior": 5, "Junior": 2 };
@@ -45,9 +90,15 @@ const scoreLead = async (orgId, leadId) => {
 
   // 4. Industry fit (0-10 points)
   const goodIndustries = ["SaaS", "Technology", "Fintech", "Financial Services"];
-  const industryScore = goodIndustries.includes(lead.industry) ? 10 : lead.industry ? 5 : 0;
+  let industryScore;
+  if (weights && weights.industry[lead.industry || "unknown"] !== undefined) {
+    industryScore = Math.round(weights.industry[lead.industry || "unknown"] * 10);
+  } else {
+    industryScore = goodIndustries.includes(lead.industry) ? 10 : lead.industry ? 5 : 0;
+  }
   score += industryScore;
   factors.industry = { value: industryScore, signal: lead.industry || "unknown" };
+
 
   // 5. Engagement signal (0-20 points)
   const [activities, emails] = await Promise.all([
@@ -59,10 +110,16 @@ const scoreLead = async (orgId, leadId) => {
   factors.engagement = { value: engagementScore, activities, emails };
 
   // 6. Source quality (0-10 points)
-  const sourceScores = { referral: 10, "partner": 8, "trade_show": 7, "website": 5, "social_media": 4, "email_campaign": 6, "cold_call": 3, "other": 1 };
-  const sourceScore = sourceScores[lead.source] || 1;
+  const defaultSourceScores = { referral: 10, "partner": 8, "trade_show": 7, "website": 5, "social_media": 4, "email_campaign": 6, "cold_call": 3, "other": 1 };
+  let sourceScore;
+  if (weights && weights.source[lead.source || "unknown"] !== undefined) {
+    sourceScore = Math.round(weights.source[lead.source || "unknown"] * 10);
+  } else {
+    sourceScore = defaultSourceScores[lead.source] || 1;
+  }
   score += sourceScore;
   factors.source = { value: sourceScore, signal: lead.source || "unknown" };
+
 
   // 7. Existing score (carry over)
   if (lead.score > 0) {
@@ -130,23 +187,49 @@ const scoreAll = asyncHandler(async (req, res) => {
 const insights = asyncHandler(async (req, res) => {
   const orgId = req.orgId;
   const leads = await prisma.lead.findMany({ where: { orgId } });
-  
+
   const hot = leads.filter((l) => l.score >= 80);
   const warm = leads.filter((l) => l.score >= 40 && l.score < 80);
   const scoredCount = leads.filter((l) => l.score > 0).length;
 
-  const summary = scoredCount > 0 
+  const summary = scoredCount > 0
     ? `Analyzed ${scoredCount} scored leads. Your pipeline has ${hot.length} high-priority hot leads and ${warm.length} warm leads.`
     : "No lead scoring data available. Run scoring to analyze your pipeline.";
 
-  const factors = [
-    { factor: "Engagement Activities", weight: 0.20 },
-    { factor: "Profile Completeness", weight: 0.20 },
-    { factor: "Job Seniority Fit", weight: 0.15 },
-    { factor: "Company Scale Fit", weight: 0.15 },
-    { factor: "Target Industry Fit", weight: 0.10 },
-    { factor: "Lead Source Quality", weight: 0.10 }
-  ];
+  const weights = await getFactorWeights(orgId);
+
+  let factors;
+  if (weights) {
+    // Data-driven: measure how much each factor's conversion rates vary.
+    // A bigger spread means that factor actually separates winners from losers.
+    const spread = (rateObj) => {
+      const values = Object.values(rateObj);
+      if (values.length === 0) return 0;
+      return Math.max(...values) - Math.min(...values);
+    };
+
+    const rawImportance = {
+      "Company Scale Fit": spread(weights.companySize),
+      "Target Industry Fit": spread(weights.industry),
+      "Lead Source Quality": spread(weights.source),
+    };
+
+    const total = Object.values(rawImportance).reduce((sum, v) => sum + v, 0) || 1;
+
+    factors = Object.entries(rawImportance)
+      .map(([factor, raw]) => ({ factor, weight: raw / total }))
+      .sort((a, b) => b.weight - a.weight);
+  } else {
+    // Not enough historical data yet (cold start) — use documented defaults.
+    factors = [
+      { factor: "Engagement Activities", weight: 0.20 },
+      { factor: "Profile Completeness", weight: 0.20 },
+      { factor: "Job Seniority Fit", weight: 0.15 },
+      { factor: "Company Scale Fit", weight: 0.15 },
+      { factor: "Target Industry Fit", weight: 0.10 },
+      { factor: "Lead Source Quality", weight: 0.10 }
+    ];
+  }
 
   const topLeads = await prisma.lead.findMany({
     where: { orgId, score: { gt: 0 } },

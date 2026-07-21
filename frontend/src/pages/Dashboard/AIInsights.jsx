@@ -43,10 +43,10 @@ const AIInsights = () => {
       <UptoCard>
         {loading && <UptoSpinner />}
         {error && <UptoError message={error} onRetry={load} />}
-        {!loading && !error && !insights && (
+        {!loading && !error && (!insights || !insights.topLeads || insights.topLeads.length === 0) && (
           <UptoEmptyState icon={Brain} title="No insights yet" body="Run scoring to get started." />
         )}
-        {!loading && !error && insights && (
+        {!loading && !error && insights?.topLeads?.length > 0 && (
           <div className="space-y-4">
             {insights.summary && (
               <div>

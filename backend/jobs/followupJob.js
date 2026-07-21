@@ -3,7 +3,7 @@
 const cron = require("node-cron");
 const { prisma } = require("../config/postgres");
 const { sendEmail } = require("../utils/sendEmail");
-const { createNotification } = require("../services/notificationService");
+const { createInAppNotification } = require("../services/notificationService");
 const { recordAudit } = require("../services/auditService");
 const logger = require("../utils/logger");
 
@@ -19,9 +19,11 @@ const tasks = {
     });
     for (const lead of leads) {
       try {
-        await createNotification({
+        await createInAppNotification({
           userId: lead.addedById,
+          orgId: lead.orgId,
           type: "LEAD_FOLLOWUP",
+          category: "lead",
           message: `Don't forget to follow up with ${lead.name}.`,
           link: `/app/leads/${lead.id}`,
           metadata: { leadId: lead.id },

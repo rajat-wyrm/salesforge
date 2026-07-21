@@ -2,7 +2,6 @@ const { prisma } = require("../config/postgres");
 const asyncHandler = require("../utils/asyncHandler");
 const response = require("../utils/response");
 const { AppError } = require("../middleware/errorHandler");
-const { createNotification } = require("../services/notificationService");
 const { recordAudit } = require("../services/auditService");
 const { publish } = require("../services/webhookService");
 
@@ -61,7 +60,9 @@ const getGlobalAnalytics = asyncHandler(async (req, res) => {
     prisma.lead.count({ where: { orgId } }),
     prisma.user.count({ where: { organizationId: orgId } }),
     1, // single-tenant
-    prisma.deal.count(),
+    prisma.deal.count({
+  where: { orgId },
+}),
     prisma.notification.count({ where: { userId: req.user.id, is_read: false } }),
     prisma.lead.count({ where: { orgId, status: "new" } }),
     prisma.lead.count({ where: { orgId, status: "qualified" } }),

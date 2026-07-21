@@ -1,16 +1,17 @@
 const { prisma } = require("../config/postgres");
 const bcrypt = require("bcryptjs");
+const { OAuth2Client } = require("google-auth-library");
 const { AppError } = require("../middleware/errorHandler");
 const asyncHandler = require("../utils/asyncHandler");
 const response = require("../utils/response");
 const generateToken = require("../utils/generateToken");
-const { createNotification } = require("../services/notificationService");
+const { dispatchNotification } = require("../services/notificationService");
 const { recordAudit } = require("../services/auditService");
-const { OAuth2Client } = require("google-auth-library");
-const crypto = require("crypto");
+//  //
 
+const { setAuthCookie } = require("../utils/authCookie");
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
+//   //
 const getSafeAdmin = (user) => ({
   id: user.id,
   name: user.name,
@@ -19,13 +20,15 @@ const getSafeAdmin = (user) => ({
   organizationId: user.organizationId,
 });
 
-const adminLogin = asyncHandler(async (req, res) => {
+// Google OAuth-based admin login
+const adminGoogleLogin = asyncHandler(async (req, res) => {
   const { credential } = req.body;
 
   if (!credential) {
     throw new AppError("Google credential is required.", 400);
   }
 
+  // Verify the Google token
   const ticket = await googleClient.verifyIdToken({
     idToken: credential,
     audience: process.env.GOOGLE_CLIENT_ID,
@@ -34,30 +37,22 @@ const adminLogin = asyncHandler(async (req, res) => {
   const payload = ticket.getPayload();
   const email = payload.email.toLowerCase();
 
-  let user = await prisma.user.findUnique({ where: { email } });
-  const hasAdmin = (await prisma.user.count({ where: { role: "ADMIN" } })) > 0;
+  // Look up the user by email
+  const user = await prisma.user.findUnique({ where: { email } });
 
   if (!user) {
-    if (hasAdmin) throw new AppError("Invalid admin credentials.", 401);
-    
-    // First admin setup via Google Login
-    const randomPassword = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 12);
-    user = await prisma.user.create({
-      data: { 
-        name: payload.name || "Platform Admin", 
-        email, 
-        password: randomPassword, 
-        role: "ADMIN", 
-        isVerified: true,
-      },
-    });
-  } else {
-    if (user.role !== "ADMIN") throw new AppError("This account is not an administrator.", 403);
+    throw new AppError("No account found with this email. Contact the platform owner.", 404);
   }
 
-  await createNotification({
+  if (user.role !== "ADMIN") {
+    throw new AppError("Access denied. This account is not an administrator.", 403);
+  }
+
+  await dispatchNotification({
     userId: user.id,
+    orgId: user.organizationId,
     type: "ADMIN_LOGIN",
+    category: "system",
     message: "Administrator login successful.",
     link: "/admin/dashboard",
   });
@@ -69,7 +64,55 @@ const adminLogin = asyncHandler(async (req, res) => {
     ipAddress: req.ip,
   });
 
-  return response.success(res, { token: generateToken(user), user: getSafeAdmin(user) });
+  const token = generateToken(user);
+  setAuthCookie(res, token);
+
+  return response.success(res, {
+    token,
+    user: getSafeAdmin(user),
+  });
+});
+
+// Legacy email/password admin login (kept as fallback)
+const adminLogin = asyncHandler(async (req, res) => {
+  const email = req.body.email.toLowerCase();
+  let user = await prisma.user.findUnique({ where: { email } });
+
+  const hasAdmin = (await prisma.user.count({ where: { role: "ADMIN" } })) > 0;
+  if (!user) {
+    if (hasAdmin) throw new AppError("Invalid admin credentials.", 401);
+    const hashed = await bcrypt.hash(req.body.password, 12);
+    user = await prisma.user.create({
+      data: { name: "Platform Admin", email, password: hashed, role: "ADMIN", isVerified: true },
+    });
+  } else {
+    if (user.role !== "ADMIN") throw new AppError("This account is not an administrator.", 403);
+    const ok = await bcrypt.compare(req.body.password, user.password);
+    if (!ok) throw new AppError("Invalid admin credentials.", 401);
+  }
+  await dispatchNotification({
+    userId: user.id,
+    orgId: user.organizationId,
+    type: "ADMIN_LOGIN",
+    category: "system",
+    message: "Administrator login successful.",
+    link: "/admin/dashboard",
+  }); //
+  await recordAudit({
+  userId: user.id,
+  action: "admin.login",
+  entityType: "User",
+  entityId: user.id,
+  ipAddress: req.ip,
+});
+  //   //
+ const token = generateToken(user);
+setAuthCookie(res, token);
+
+return response.success(res, {
+  user: getSafeAdmin(user),
+});
+//    //
 });
 
 const getDashboardSummary = asyncHandler(async (req, res) => {
@@ -145,7 +188,11 @@ const updateUser = asyncHandler(async (req, res) => {
     entityId: user.id,
     metadata: data,
   });
-  return response.success(res, { message: "User updated." });
+  //   //
+ return response.success(res, {
+  message: "User updated.",
+});
+//   //
 });
 
 const getPlatformStats = asyncHandler(async (req, res) => {
@@ -161,10 +208,38 @@ const getPlatformStats = asyncHandler(async (req, res) => {
   });
 });
 
+const triggerSystemEvent = asyncHandler(async (req, res) => {
+  const { eventType, message } = req.body;
+  if (!["MAINTENANCE_NOTICE", "BACKUP_COMPLETED"].includes(eventType)) {
+    throw new AppError("Invalid event type.", 400);
+  }
+
+  // To simulate a system-wide broadcast, we notify the current admin
+  // or we could loop through all users in req.orgId. For performance in this demo,
+  // we will just notify the admin who triggered it, or all users in the org if needed.
+  // We'll fetch all users in the organization to notify them.
+  const users = await prisma.user.findMany({ where: { organizationId: req.orgId }, select: { id: true } });
+  
+  for (const user of users) {
+    await dispatchNotification({
+      userId: user.id,
+      orgId: req.orgId,
+      type: eventType,
+      category: "system",
+      message: message || (eventType === "MAINTENANCE_NOTICE" ? "System maintenance scheduled." : "System backup completed successfully."),
+      link: "/app/dashboard",
+    });
+  }
+
+  return response.success(res, { message: `Triggered ${eventType} for ${users.length} users.` });
+});
+
 module.exports = {
   adminLogin,
+  adminGoogleLogin,
   getDashboardSummary,
   listAllUsers,
   updateUser,
   getPlatformStats,
+  triggerSystemEvent,
 };

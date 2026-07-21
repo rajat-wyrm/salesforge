@@ -13,8 +13,13 @@ const Campaigns = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [draft, setDraft] = useState({ name: "", subject: "", audience: "all" });
+const [editingId, setEditingId] = useState(null);
 
+const [draft, setDraft] = useState({
+  name: "",
+  subject: "",
+  audience: "all",
+});
   const load = async () => {
     setLoading(true);
     try {
@@ -28,18 +33,65 @@ const Campaigns = () => {
   useEffect(() => { load(); }, []);
 
   const handleCreate = async (e) => {
-    e.preventDefault();
-    try {
+  e.preventDefault();
+
+  try {
+    if (editingId) {
+      await campaignService.update(editingId, draft);
+      toast.success("Campaign updated");
+    } else {
       await campaignService.create(draft);
       toast.success("Campaign created");
-      setShowCreate(false);
-      setDraft({ name: "", subject: "", audience: "all" });
-      load();
-    } catch (err) { toast.error(err?.message || "Create failed"); }
-  };
+    }
+
+    setShowCreate(false);
+    setEditingId(null);
+
+    setDraft({
+      name: "",
+      subject: "",
+      audience: "all",
+    });
+
+    load();
+  } catch (err) {
+    toast.error(err?.message || "Operation failed");
+  }
+};
 
   const handleLaunch = async (id) => { try { await campaignService.launch(id); load(); } catch (_) {} };
+  const handlePause = async (id) => {
+  try {
+    await campaignService.pause(id);
+    toast.success("Campaign paused");
+    load();
+  } catch (err) {
+    toast.error(err?.message || "Pause failed");
+  }
+};
+  const handleDelete = async (id) => {
+  const ok = window.confirm("Delete this campaign?");
+  if (!ok) return;
 
+  try {
+    await campaignService.remove(id);
+    toast.success("Campaign deleted");
+    load();
+  } catch (err) {
+    toast.error(err?.message || "Delete failed");
+  }
+};
+const handleEdit = (campaign) => {
+  setEditingId(campaign.id);
+
+  setDraft({
+  name: campaign.name || "",
+  subject: campaign.conditions?.subject || "",
+  audience: campaign.conditions?.audience || "all",
+});
+
+  setShowCreate(true);
+};
   return (
     <UptoPage>
       <UptoHero
@@ -59,12 +111,47 @@ const Campaigns = () => {
               <div key={c.id} className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-between">
                 <div>
                   <div className="font-medium">{c.name}</div>
-                  <div className="text-xs text-slate-500">{c.audience || "All"} · {c.subject || "—"}</div>
+                  <div className="text-xs text-slate-500">
+  {c.conditions?.audience || "All"} · {c.conditions?.subject || "—"}
+</div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <UptoBadge>{c.status || "draft"}</UptoBadge>
-                  {c.status !== "running" && <UptoButton variant="ghost" onClick={() => handleLaunch(c.id)}>Launch</UptoButton>}
-                </div>
+              <div className="flex items-center gap-2">
+
+  <UptoBadge>
+    {c.active ? "Running" : "Draft"}
+  </UptoBadge>
+
+  {!c.active ? (
+    <UptoButton
+      variant="ghost"
+      onClick={() => handleLaunch(c.id)}
+    >
+      Launch
+    </UptoButton>
+  ) : (
+    <UptoButton
+      variant="secondary"
+      onClick={() => handlePause(c.id)}
+    >
+      Pause
+    </UptoButton>
+  )}
+
+  <UptoButton
+  variant="ghost"
+  onClick={() => handleEdit(c)}
+>
+  Edit
+</UptoButton>
+
+  <UptoButton
+    variant="danger"
+    onClick={() => handleDelete(c.id)}
+  >
+    Delete
+  </UptoButton>
+
+</div>
               </div>
             ))}
           </div>
@@ -73,7 +160,9 @@ const Campaigns = () => {
       {showCreate && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <form onSubmit={handleCreate} className="bg-white dark:bg-slate-900 rounded-2xl p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold mb-4">New campaign</h3>
+            <h3 className="text-lg font-semibold mb-4">
+  {editingId ? "Edit campaign" : "New campaign"}
+</h3>
             <div className="space-y-3">
               <UptoInput label="Name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required />
               <UptoInput label="Subject" value={draft.subject} onChange={(e) => setDraft({ ...draft, subject: e.target.value })} />
@@ -81,7 +170,9 @@ const Campaigns = () => {
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <UptoButton type="button" variant="ghost" onClick={() => setShowCreate(false)}>Cancel</UptoButton>
-              <UptoButton type="submit">Create</UptoButton>
+              <UptoButton type="submit">
+  {editingId ? "Save Changes" : "Create"}
+</UptoButton>
             </div>
           </form>
         </div>

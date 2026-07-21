@@ -11,6 +11,19 @@ const { recordAudit } = require("../services/auditService");
 const TICKET_STATUSES = ["open", "in_progress", "waiting", "resolved", "closed"];
 const TICKET_PRIORITIES = ["low", "medium", "high", "urgent"];
 
+// Map ticket statuses to valid ActivityStatus enum values
+const TICKET_STATUS_TO_ACTIVITY = {
+  open: "SCHEDULED",
+  in_progress: "IN_PROGRESS",
+  waiting: "SCHEDULED",
+  resolved: "COMPLETED",
+  closed: "COMPLETED",
+};
+
+const ACTIVITY_TO_TICKET_STATUS = Object.fromEntries(
+  Object.entries(TICKET_STATUS_TO_ACTIVITY).map(([k, v]) => [v, k])
+);
+
 const generateTicketNumber = () => {
   const ts = Date.now().toString(36).toUpperCase();
   return `T-${ts}`;
@@ -27,6 +40,7 @@ const decorate = (a) => {
     subject: m.subject || a.title,
     body: m.body,
     priority: m.priority || "medium",
+    status: m.ticketStatus || ACTIVITY_TO_TICKET_STATUS[a.status] || "open",
     tags: m.tags || [],
     comments: m.comments || [],
   };
@@ -35,7 +49,6 @@ const decorate = (a) => {
 const list = asyncHandler(async (req, res) => {
   const { page = 1, limit = 50, status, priority, assignedTo } = req.query;
   const where = { orgId: req.orgId, kind: "TASK" };
-  if (status) where.status = status.toUpperCase();
   if (assignedTo) where.userId = Number(assignedTo);
   const skip = (Number(page) - 1) * Number(limit);
   const [items, total] = await Promise.all([
@@ -46,6 +59,7 @@ const list = asyncHandler(async (req, res) => {
     prisma.activity.count({ where }),
   ]);
   let tickets = items.filter(isTicket).map(decorate);
+  if (status) tickets = tickets.filter((t) => t.status === status);
   if (priority) tickets = tickets.filter((t) => t.priority === priority);
   return response.paginated(res, tickets, total, page, limit);
 });
@@ -69,7 +83,7 @@ const create = asyncHandler(async (req, res) => {
       orgId: req.orgId,
       userId: assigneeId ? Number(assigneeId) : req.user.id,
       kind: "TASK",
-      status: status.toUpperCase(),
+      status: TICKET_STATUS_TO_ACTIVITY[status] || "SCHEDULED",
       entityType: leadId ? "LEAD" : dealId ? "DEAL" : "LEAD",
       entityId: leadId || dealId || 1,
       title: subject,
@@ -80,6 +94,7 @@ const create = asyncHandler(async (req, res) => {
         subject,
         body: description,
         priority,
+        ticketStatus: status,
         tags: tags || [],
         contactId,
         source: "web",
@@ -107,7 +122,8 @@ const update = asyncHandler(async (req, res) => {
     meta.body = description;
   }
   if (status !== undefined) {
-    data.status = status.toUpperCase();
+    meta.ticketStatus = status;
+    data.status = TICKET_STATUS_TO_ACTIVITY[status] || "SCHEDULED";
     if (status === "resolved" || status === "closed") data.completedAt = new Date();
   }
   if (priority !== undefined) meta.priority = priority;
@@ -149,11 +165,12 @@ const metrics = asyncHandler(async (req, res) => {
   let totalResolutionTime = 0;
   let resolvedCount = 0;
   for (const t of tickets) {
-    byStatus[t.status] = (byStatus[t.status] || 0) + 1;
+    const ts = t.metadata?.ticketStatus || "open";
+    byStatus[ts] = (byStatus[ts] || 0) + 1;
     const p = t.metadata?.priority || "medium";
     byPriority[p] = (byPriority[p] || 0) + 1;
-    if (t.status === "OPEN" || t.status === "IN_PROGRESS" || t.status === "WAITING") open++;
-    if (t.status === "RESOLVED" || t.status === "CLOSED") {
+    if (ts === "open" || ts === "in_progress" || ts === "waiting") open++;
+    if (ts === "resolved" || ts === "closed") {
       resolved++;
       if (t.completedAt) {
         totalResolutionTime += new Date(t.completedAt) - new Date(t.createdAt);

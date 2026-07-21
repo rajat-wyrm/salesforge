@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { tokenStore } from "@/lib/api";
 import { changelogService, onboardingService, notificationPrefService, gdprService } from "@/services";
 import { useUptoStyles, UptoPage, UptoHero, UptoSectionHeading, UptoButton, UptoBadge, UptoSpinner, UptoError, UptoEmptyState, UptoCard } from "@/components/UI/UptoHooks";
 import { Sparkles, Mail, Bell, Smartphone, Download, Trash2, Check, Star, Zap, Shield, Wrench } from "lucide-react";
@@ -117,13 +118,33 @@ const NotificationPreferences = () => {
   const { darkMode } = s;
   const [prefs, setPrefs] = useState([]);
   const [loading, setLoading] = useState(true);
-  useEffect(() => { notificationPrefService.list().then(setPrefs).finally(() => setLoading(false)); }, []);
+  const [saving, setSaving] = useState(false);
+
+  const loadPrefs = () => {
+    setLoading(true);
+    notificationPrefService.list().then(setPrefs).finally(() => setLoading(false));
+  };
+
+  useEffect(() => { loadPrefs(); }, []);
 
   const toggle = async (pref) => {
-    const next = prefs.map((p) => p.channel === pref.channel && p.category === pref.category ? { ...p, enabled: !p.enabled } : p);
+    if (!pref || (!pref.channel && !pref.category)) return;
+    const next = prefs.map((p) =>
+      p.channel === pref.channel && p.category === pref.category
+        ? { ...p, enabled: !p.enabled }
+        : p
+    );
     setPrefs(next);
-    try { await notificationPrefService.update(next); }
-    catch (e) { toast.error(e.message); setPrefs(prefs); }
+    setSaving(true);
+    try {
+      await notificationPrefService.update(next.filter((p) => p.channel && p.category));
+      toast.success("Preference saved!");
+    } catch (e) {
+      toast.error(e.message || "Failed to save preference.");
+      setPrefs(prefs); // rollback
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) return <UptoSpinner />;
@@ -191,8 +212,17 @@ const DataExport = () => {
     const password = prompt("Enter your password to confirm deletion:");
     if (!password) return;
     if (!confirm("This will permanently delete your account and all data. Continue?")) return;
-    try { await gdprService.deleteAccount(password); toast.success("Account deleted"); await logout(); navigate("/"); }
-    catch (e) { toast.error(e.message); }
+    console.log('Deleting account with token:', tokenStore.get());
+    try {
+      await gdprService.deleteAccount(password);
+      toast.success("Account deleted");
+      await logout();
+      navigate("/");
+    }
+    catch (e) {
+      console.error('Delete account error:', e);
+      toast.error(e.message);
+    }
   };
   return (
     <UptoPage>

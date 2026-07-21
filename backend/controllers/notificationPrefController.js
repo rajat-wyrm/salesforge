@@ -5,7 +5,10 @@ const response = require("../utils/response");
 
 const list = asyncHandler(async (req, res) => {
   const prefs = await prisma.notificationPreference.findMany({
-    where: { userId: req.user.id, orgId: req.orgId },
+    where: {
+      userId: req.user.id,
+      OR: [{ orgId: req.orgId || null }, { orgId: null }],
+    },
   });
   // Backfill defaults if none.
   const defaults = ["lead", "deal", "billing", "team", "system"];
@@ -13,7 +16,10 @@ const list = asyncHandler(async (req, res) => {
   const out = [];
   for (const category of defaults) {
     for (const channel of channels) {
-      const existing = prefs.find((p) => p.category === category && p.channel === channel);
+      // Prefer org-scoped pref; fall back to user-only; then default to enabled.
+      const existing =
+        prefs.find((p) => p.category === category && p.channel === channel && p.orgId === (req.orgId || null)) ||
+        prefs.find((p) => p.category === category && p.channel === channel && p.orgId === null);
       out.push(existing || { channel, category, enabled: true, isDefault: true });
     }
   }
@@ -25,18 +31,37 @@ const update = asyncHandler(async (req, res) => {
   if (!Array.isArray(preferences)) throw new AppError("preferences must be an array.", 400);
   for (const p of preferences) {
     if (!p.channel || !p.category) continue;
-    await prisma.notificationPreference.upsert({
-      where: {
-        userId_orgId_channel_category: {
-          userId: req.user.id,
-          orgId: req.orgId,
-          channel: p.channel,
-          category: p.category,
+    const effectiveOrgId = req.orgId || null;
+    if (effectiveOrgId) {
+      // Org-scoped upsert
+      await prisma.notificationPreference.upsert({
+        where: {
+          userId_orgId_channel_category: {
+            userId: req.user.id,
+            orgId: effectiveOrgId,
+            channel: p.channel,
+            category: p.category,
+          },
         },
-      },
-      create: { userId: req.user.id, orgId: req.orgId, channel: p.channel, category: p.category, enabled: !!p.enabled },
-      update: { enabled: !!p.enabled },
-    });
+        create: { userId: req.user.id, orgId: effectiveOrgId, channel: p.channel, category: p.category, enabled: !!p.enabled },
+        update: { enabled: !!p.enabled },
+      });
+    } else {
+      // User-only (no org) — findFirst + upsert workaround since null breaks unique key
+      const existing = await prisma.notificationPreference.findFirst({
+        where: { userId: req.user.id, orgId: null, channel: p.channel, category: p.category },
+      });
+      if (existing) {
+        await prisma.notificationPreference.update({
+          where: { id: existing.id },
+          data: { enabled: !!p.enabled },
+        });
+      } else {
+        await prisma.notificationPreference.create({
+          data: { userId: req.user.id, orgId: null, channel: p.channel, category: p.category, enabled: !!p.enabled },
+        });
+      }
+    }
   }
   return response.success(res, { message: "Preferences saved." });
 });

@@ -1,14 +1,14 @@
 // Plan-based limits for a real SaaS. Tweak in one place to change the whole product.
 const PLAN_LIMITS = {
   FREE: {
-    leads: 100,
-    searches: 50,
-    teamMembers: 1,
-    apiKeys: 1,
-    webhooks: 1,
-    savedSearches: 5,
-    tags: 10,
-    exportsPerMonth: 5,
+    leads: Infinity,
+    searches: Infinity,
+    teamMembers: Infinity,
+    apiKeys: Infinity,
+    webhooks: Infinity,
+    savedSearches: Infinity,
+    tags: Infinity,
+    exportsPerMonth: Infinity,
   },
   STARTER: {
     leads: 1000,

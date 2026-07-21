@@ -1,31 +1,46 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { api, tokenStore, userStore, orgStore, unwrap } from "../lib/api";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import {
+  api,
+  clearAuthState,
+  orgStore,
+  unwrap,
+  userStore,
+} from "../lib/api";
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => userStore.get());
   const [organization, setOrganization] = useState(() => orgStore.get());
-  const [loading, setLoading] = useState(!!tokenStore.get());
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const refresh = useCallback(async () => {
-    if (!tokenStore.get()) {
-      setUser(null);
-      setOrganization(null);
-      setLoading(false);
-      return;
-    }
+    setLoading(true);
+
     try {
       const data = await unwrap(api.get("/auth/me"));
+
       setUser(data.user);
-      setOrganization(data.organization);
+      setOrganization(data.organization || null);
+
       userStore.set(data.user);
-      orgStore.set(data.organization);
+      orgStore.set(data.organization || null);
+
+      return data;
     } catch {
-      tokenStore.clear();
+  clearAuthState();
       setUser(null);
       setOrganization(null);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -35,56 +50,118 @@ export const AuthProvider = ({ children }) => {
     refresh();
   }, [refresh]);
 
-  const login = useCallback(async (email, password) => {
-    const data = await unwrap(api.post("/auth/login", { email, password }));
-    tokenStore.set(data.token);
-    userStore.set(data.user);
-    setUser(data.user);
-    await refresh();
-    return data;
-  }, [refresh]);
+  const login = useCallback(
+    async (email, password) => {
+      setError(null);
 
-  const register = useCallback(async (payload) => {
-    const data = await unwrap(api.post("/auth/register", payload));
-    tokenStore.set(data.token);
-    userStore.set(data.user);
-    setUser(data.user);
-    await refresh();
-    return data;
-  }, [refresh]);
+      try {
+        const data = await unwrap(
+          api.post("/auth/login", { email, password }),
+        );
+
+        setUser(data.user);
+        userStore.set(data.user);
+
+        await refresh();
+        return data;
+      } catch (err) {
+        setError(err.message);
+        throw err;
+      }
+    },
+    [refresh],
+  );
+
+  const register = useCallback(
+    async (payload) => {
+      setError(null);
+
+      try {
+        const data = await unwrap(api.post("/auth/register", payload));
+
+        setUser(data.user);
+        userStore.set(data.user);
+
+        await refresh();
+        return data;
+      } catch (err) {
+        setError(err.message);
+        throw err;
+      }
+    },
+    [refresh],
+  );
 
   const logout = useCallback(async () => {
-    try { await unwrap(api.post("/auth/logout")); } catch { /* ignore */ }
-    tokenStore.clear();
+    try {
+      await unwrap(api.post("/auth/logout"));
+    } catch {
+      // Clear local display data even if the server is unavailable.
+    }
+
+    clearAuthState();
     setUser(null);
     setOrganization(null);
-    localStorage.removeItem("chatHistory");
   }, []);
 
-  const updateUser = useCallback((next) => {
-    setUser(next);
-    userStore.set(next);
+  const updateUser = useCallback((nextUser) => {
+    setUser(nextUser);
+    userStore.set(nextUser);
   }, []);
 
-  const updateOrganization = useCallback((next) => {
-    setOrganization(next);
-    orgStore.set(next);
+  const updateOrganization = useCallback((nextOrganization) => {
+    setOrganization(nextOrganization);
+    orgStore.set(nextOrganization);
   }, []);
 
-  const value = useMemo(() => ({
-    user, organization, loading, error, login, register, logout, refresh, updateUser, updateOrganization,
-    isAuthenticated: !!user,
-    isOwner: user?.role === "OWNER",
-    isAdmin: user?.role === "ADMIN" || user?.role === "OWNER",
-    isMember: user && ["OWNER", "ADMIN", "MEMBER"].includes(user.role),
-    isViewer: user && ["OWNER", "ADMIN", "MEMBER", "VIEWER"].includes(user.role),
-  }), [user, organization, loading, error, login, register, logout, refresh, updateUser, updateOrganization]);
+  const value = useMemo(
+    () => ({
+      user,
+      organization,
+      loading,
+      error,
+      login,
+      register,
+      logout,
+      refresh,
+      updateUser,
+      updateOrganization,
+      isAuthenticated: Boolean(user),
+      isOwner: user?.role === "OWNER",
+      isAdmin: user?.role === "ADMIN" || user?.role === "OWNER",
+      isMember:
+        user && ["OWNER", "ADMIN", "MEMBER"].includes(user.role),
+      isViewer:
+        user &&
+        ["OWNER", "ADMIN", "MEMBER", "VIEWER"].includes(user.role),
+    }),
+    [
+      user,
+      organization,
+      loading,
+      error,
+      login,
+      register,
+      logout,
+      refresh,
+      updateUser,
+      updateOrganization,
+    ],
+  );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within an AuthProvider");
-  return ctx;
+  const context = useContext(AuthContext);
+
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+
+  return context;
 };
