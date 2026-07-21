@@ -1,5 +1,5 @@
 const { AppError } = require("../middleware/errorHandler");
-const { createInAppNotification } = require("../services/notificationService");
+const { dispatchNotification } = require("../services/notificationService");
 const { recordAudit } = require("../services/auditService");
 const { incrementUsage } = require("../services/usageService");
 const { publish } = require("../services/webhookService");
@@ -55,7 +55,7 @@ const socialSearch = asyncHandler(async (req, res) => {
     data: { userId: req.user.id, orgId: req.orgId, type: "SOCIAL_SEARCH", resource: "social" },
   });
   await incrementUsage({ userId: req.user.id, orgId: req.orgId, resource: "searches" });
-  await createInAppNotification({
+  await dispatchNotification({
     userId: req.user.id,
     orgId: req.orgId,
     type: "SOCIAL_SEARCH",

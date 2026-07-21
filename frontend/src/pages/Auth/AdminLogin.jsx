@@ -2,9 +2,12 @@ import React, { useState } from "react";
 import { Loader2, ShieldCheck, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { GoogleLogin } from "@react-oauth/google";
+import { api, tokenStore } from "../../lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 const AdminLogin = () => {
   const navigate = useNavigate();
+  const { refresh } = useAuth();
 
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -14,31 +17,37 @@ const AdminLogin = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3000/api/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credential: credentialResponse.credential })
+      const res = await api.post("/admin/login", {
+        credential: credentialResponse.credential,
       });
 
-      const data = await response.json();
+      const data = res.data.data || res.data;
+      const token = data.token;
+      const user = data.user;
 
-      if (response.ok) {
-        // ✅ SUCCESS
-        const token = data.data.token;
-        const user = data.data.user;
-        
-        localStorage.setItem("adminToken", token);
-        localStorage.setItem("isLoggedIn", "true"); 
-        localStorage.setItem("adminEmail", user.email);
-        localStorage.setItem("userRole", user.role); 
+      // Store the token so the API client sends it on subsequent requests
+      if (token) tokenStore.set(token);
 
-        navigate("/admin-dashboard");
+      // Store admin info in localStorage for quick access
+      localStorage.setItem("isLoggedIn", "true");
+      if (user?.email) localStorage.setItem("adminEmail", user.email);
+      if (user?.role) localStorage.setItem("userRole", user.role);
+
+      // Refresh the auth context so RequireAuth/RequireAdmin guards work
+      await refresh();
+
+      // Role-based redirect: ADMIN goes to admin-dashboard
+      if (user?.role === "ADMIN") {
+        navigate("/admin-dashboard", { replace: true });
       } else {
-        // ❌ FAILURE
-        setError(data.message || data.error || "Access Denied. You must be an administrator.");
+        navigate("/dashboard", { replace: true });
       }
     } catch (err) {
-      setError("Could not connect to the backend server.");
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Access Denied. You must be an administrator.";
+      setError(msg);
     } finally {
       setIsLoading(false);
     }

@@ -1,6 +1,6 @@
 const { prisma } = require("../config/postgres");
 const { AppError } = require("../middleware/errorHandler");
-const { createInAppNotification } = require("../services/notificationService");
+const { dispatchNotification } = require("../services/notificationService");
 const asyncHandler = require("../utils/asyncHandler");
 const response = require("../utils/response");
 const { recordAudit } = require("../services/auditService");
@@ -165,8 +165,8 @@ const createDeal = asyncHandler(async (req, res) => {
   });
   await recordAudit({ userId: req.user.id, orgId: req.orgId, action: "deal.create", entityType: "Deal", entityId: deal.id, metadata: { amount, title } });
   await publish({ orgId: req.orgId, event: "DEAL_CREATED", payload: { dealId: deal.id, title, amount } });
-  await createInAppNotification({
-    userId: req.user.id,
+  await dispatchNotification({
+    userId: deal.ownerId ? deal.ownerId : req.user.id,
     orgId: req.orgId,
     type: "DEAL_CREATED",
     category: "deal",
@@ -208,13 +208,29 @@ const updateDeal = asyncHandler(async (req, res) => {
   await recordAudit({ userId: req.user.id, orgId: req.orgId, action: "deal.update", entityType: "Deal", entityId: deal.id, metadata: data });
   await publish({ orgId: req.orgId, event: "DEAL_UPDATED", payload: { dealId: deal.id } });
   
+  const targetUserId = updated.ownerId ? updated.ownerId : req.user.id;
+  
+  // Notify if stage changed
   if (req.body.stageId !== undefined && deal.stageId !== req.body.stageId) {
-    await createInAppNotification({
-      userId: req.user.id,
+    if (targetUserId !== req.user.id || !updated.ownerId) {
+      await dispatchNotification({
+        userId: targetUserId,
+        orgId: req.orgId,
+        type: "DEAL_UPDATED",
+        category: "deal",
+        message: `Deal "${updated.title}" moved to ${updated.stageRef.name} by ${req.user.name || 'someone'}.`,
+        link: `/app/deals/${updated.id}`,
+        metadata: { dealId: updated.id }
+      });
+    }
+  } else if (Object.keys(data).length > 0 && (targetUserId !== req.user.id || !updated.ownerId)) {
+    // Notify if other updates happened
+    await dispatchNotification({
+      userId: targetUserId,
       orgId: req.orgId,
       type: "DEAL_UPDATED",
       category: "deal",
-      message: `Deal "${updated.title}" moved to ${updated.stageRef.name}.`,
+      message: `Deal "${updated.title}" was updated by ${req.user.name || 'someone'}.`,
       link: `/app/deals/${updated.id}`,
       metadata: { dealId: updated.id }
     });

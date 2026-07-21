@@ -1,14 +1,16 @@
 const { prisma } = require("../config/postgres");
 const bcrypt = require("bcryptjs");
+const { OAuth2Client } = require("google-auth-library");
 const { AppError } = require("../middleware/errorHandler");
 const asyncHandler = require("../utils/asyncHandler");
 const response = require("../utils/response");
 const generateToken = require("../utils/generateToken");
-const { createInAppNotification } = require("../services/notificationService");
+const { dispatchNotification } = require("../services/notificationService");
 const { recordAudit } = require("../services/auditService");
 //  //
 
 const { setAuthCookie } = require("../utils/authCookie");
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 //   //
 const getSafeAdmin = (user) => ({
   id: user.id,
@@ -18,6 +20,60 @@ const getSafeAdmin = (user) => ({
   organizationId: user.organizationId,
 });
 
+// Google OAuth-based admin login
+const adminGoogleLogin = asyncHandler(async (req, res) => {
+  const { credential } = req.body;
+
+  if (!credential) {
+    throw new AppError("Google credential is required.", 400);
+  }
+
+  // Verify the Google token
+  const ticket = await googleClient.verifyIdToken({
+    idToken: credential,
+    audience: process.env.GOOGLE_CLIENT_ID,
+  });
+
+  const payload = ticket.getPayload();
+  const email = payload.email.toLowerCase();
+
+  // Look up the user by email
+  const user = await prisma.user.findUnique({ where: { email } });
+
+  if (!user) {
+    throw new AppError("No account found with this email. Contact the platform owner.", 404);
+  }
+
+  if (user.role !== "ADMIN") {
+    throw new AppError("Access denied. This account is not an administrator.", 403);
+  }
+
+  await dispatchNotification({
+    userId: user.id,
+    orgId: user.organizationId,
+    type: "ADMIN_LOGIN",
+    category: "system",
+    message: "Administrator login successful.",
+    link: "/admin/dashboard",
+  });
+  await recordAudit({
+    userId: user.id,
+    action: "admin.login",
+    entityType: "User",
+    entityId: user.id,
+    ipAddress: req.ip,
+  });
+
+  const token = generateToken(user);
+  setAuthCookie(res, token);
+
+  return response.success(res, {
+    token,
+    user: getSafeAdmin(user),
+  });
+});
+
+// Legacy email/password admin login (kept as fallback)
 const adminLogin = asyncHandler(async (req, res) => {
   const email = req.body.email.toLowerCase();
   let user = await prisma.user.findUnique({ where: { email } });
@@ -34,7 +90,7 @@ const adminLogin = asyncHandler(async (req, res) => {
     const ok = await bcrypt.compare(req.body.password, user.password);
     if (!ok) throw new AppError("Invalid admin credentials.", 401);
   }
-  await createInAppNotification({
+  await dispatchNotification({
     userId: user.id,
     orgId: user.organizationId,
     type: "ADMIN_LOGIN",
@@ -165,7 +221,7 @@ const triggerSystemEvent = asyncHandler(async (req, res) => {
   const users = await prisma.user.findMany({ where: { organizationId: req.orgId }, select: { id: true } });
   
   for (const user of users) {
-    await createInAppNotification({
+    await dispatchNotification({
       userId: user.id,
       orgId: req.orgId,
       type: eventType,
@@ -180,6 +236,7 @@ const triggerSystemEvent = asyncHandler(async (req, res) => {
 
 module.exports = {
   adminLogin,
+  adminGoogleLogin,
   getDashboardSummary,
   listAllUsers,
   updateUser,

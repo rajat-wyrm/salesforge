@@ -3,7 +3,7 @@ const { AppError } = require("../middleware/errorHandler");
 const asyncHandler = require("../utils/asyncHandler");
 const response = require("../utils/response");
 const { recordActivity } = require("../services/leadActivityService");
-const { createInAppNotification } = require("../services/notificationService");
+const { dispatchNotification } = require("../services/notificationService");
 
 const ensureLeadInOrg = async (leadId, orgId) => {
   const lead = await prisma.lead.findFirst({ where: { id: Number(leadId), orgId } });
@@ -63,7 +63,7 @@ const create = asyncHandler(async (req, res) => {
   });
 
   if (assignee.id !== req.user.id) {
-    await createInAppNotification({
+    await dispatchNotification({
       userId: assignee.id,
       orgId: req.orgId,
       type: "TASK_ASSIGNED",
@@ -106,7 +106,7 @@ const update = asyncHandler(async (req, res) => {
   }
 
   if (userId !== undefined && Number(userId) !== req.user.id) {
-    await createInAppNotification({
+    await dispatchNotification({
       userId: Number(userId),
       orgId: req.orgId,
       type: "TASK_ASSIGNED",

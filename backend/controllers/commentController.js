@@ -4,7 +4,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const response = require("../utils/response");
 const { recordAudit } = require("../services/auditService");
 const eventBus = require("../services/eventBus");
-const { createInAppNotification } = require("../services/notificationService");
+const { dispatchNotification } = require("../services/notificationService");
 
 const VALID_ENTITIES = ["LEAD", "DEAL", "ACTIVITY", "TASK", "NOTE"];
 
@@ -52,7 +52,7 @@ const create = asyncHandler(async (req, res) => {
   for (const handle of mentions) {
     const user = await prisma.user.findFirst({ where: { name: { contains: handle, mode: "insensitive" }, organizationId: req.orgId } });
     if (user && user.id !== req.user.id) {
-      await createInAppNotification({
+      await dispatchNotification({
         userId: user.id,
         orgId: req.orgId,
         type: "MENTION",

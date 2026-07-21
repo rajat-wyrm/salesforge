@@ -6,11 +6,13 @@ import { UptoError as ErrorBanner, UptoSpinner as FullPageSpinner, UptoBadge as 
 import { Activity, BarChart3, TrendingUp, Users, Target, Search, MailCheck, Globe2, Link2, Sparkles, AlertCircle, Zap, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 const Dashboard = () => {
   const { theme } = useTheme();
   const darkMode = theme === "dark";
   const navigate = useNavigate();
+  usePushNotifications(0);
   const [data, setData] = useState(null);
   const [usage, setUsage] = useState(null);
   const [insights, setInsights] = useState([]);

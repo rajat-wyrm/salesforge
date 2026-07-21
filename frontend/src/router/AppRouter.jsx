@@ -196,13 +196,17 @@ const RequireAdmin = ({ children }) => {
 };
 
 const RootRedirect = () => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
   if (loading) return (
     <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
       <div className="h-12 w-12 animate-spin rounded-full border-4 border-teal-500 border-t-transparent" />
     </div>
   );
-  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
+  if (isAuthenticated) {
+    // Role-based redirect: ADMIN users go to admin dashboard
+    if (user?.role === "ADMIN") return <Navigate to="/admin-dashboard" replace />;
+    return <Navigate to="/dashboard" replace />;
+  }
   return <ErrorBoundary><Landing /></ErrorBoundary>;
 };
 

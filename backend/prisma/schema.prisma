@@ -123,6 +123,7 @@ model User {
   playbooks               Playbook[]               @relation("PlaybookCreator")
   winLossRecords          WinLossRecord[]          @relation("WinLossRecorder")
   intelSearches           IntelSearch[]
+  fcmTokens               FcmToken[]
 
   @@map("users")
 }
@@ -1593,3 +1594,14 @@ model IntelSearch {
   @@map("intel_searches")
 }
 
+model FcmToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("fcm_tokens")
+}

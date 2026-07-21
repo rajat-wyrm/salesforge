@@ -159,7 +159,7 @@ export const orgService = {
 };
 
 export const adminService = {
-  login: (email, password) => unwrap(api.post("/admin/login", { email, password })),
+  login: (credential) => unwrap(api.post("/admin/login", { credential })),
   dashboard: () => unwrap(api.get("/admin/dashboard")),
   users: (params) => unwrapList(api.get("/admin/users", { params })),
   updateUser: (id, data) => unwrap(api.patch(`/admin/users/${id}`, data)),

@@ -77,6 +77,7 @@ const webhookRoutes = require("./routes/webhookRoutes");
 const webhookIncomingRoutes = require("./routes/webhookIncomingRoutes");
 const workflowRoutes = require("./routes/workflowRoutes");
 const chatRoutes = require("./routes/chatRoutes");
+const pushRoutes = require("./routes/pushRoutes");
 
 // Optional feature routes
 let aiRoutes;
@@ -175,6 +176,7 @@ app.use("/api/organizations", organizationRoutes);
 app.use("/api/leads", leadRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/push", pushRoutes);
 app.use("/api/email-search", emailSearchRoutes);
 app.use("/api/domain-search", domainSearchRoutes);
 app.use("/api/social-search", socialSearchRoutes);

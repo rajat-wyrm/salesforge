@@ -40,8 +40,15 @@ const Login = () => {
         credential: credentialResponse.credential,
       });
       tokenStore.set(res.data.data.token);
-      await refresh();
-      navigate(redirect, { replace: true });
+      const authData = await refresh();
+
+      // Role-based redirect: ADMIN users go to admin dashboard
+      const userRole = authData?.user?.role || res.data.data.user?.role;
+      if (userRole === "ADMIN") {
+        navigate("/admin-dashboard", { replace: true });
+      } else {
+        navigate(redirect, { replace: true });
+      }
     } catch (err) {
       const msg =
         err?.response?.data?.message ||

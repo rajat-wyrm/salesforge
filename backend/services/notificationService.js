@@ -1,5 +1,7 @@
 const { prisma } = require("../config/postgres");
 const eventBus = require("./eventBus");
+const { sendPushNotification } = require("./pushService");
+const { sendNotificationEmail } = require("./emailService");
 
 // ---------------------------------------------------------------------------
 // Primitive: creates a notification row without any preference check.
@@ -26,12 +28,15 @@ const createNotification = async ({
     at: new Date().toISOString(),
   });
 
+  // Also send a push notification since this bypasses preferences
+  await sendPushNotification(userId, { title: type, body: message, icon: link });
+
   return notification;
 };
 
 // ---------------------------------------------------------------------------
-// Preferred helper: respects the user's in_app preference for a given
-// category before creating and broadcasting the notification.
+// Preferred helper: respects the user's preferences for all channels
+// before creating and broadcasting the notification.
 //
 // @param {object} opts
 //   - userId    {number}  – recipient
@@ -42,7 +47,7 @@ const createNotification = async ({
 //   - link      {string|null}
 //   - metadata  {object}
 // ---------------------------------------------------------------------------
-const createInAppNotification = async ({
+const dispatchNotification = async ({
   userId,
   orgId,
   type,
@@ -53,38 +58,79 @@ const createInAppNotification = async ({
 }) => {
   if (!userId) return null;
 
-  // Look up the user's in_app preference for this category.
-  // If a row exists with enabled=false the user has turned it off.
-  // If no row exists we treat it as enabled (default: true).
+  let inAppEnabled = true;
+  let pushEnabled = true;
+  let emailEnabled = true;
+
   if (category) {
     // Try org-scoped pref first, then fall back to user-only pref (null orgId) for system events.
-    const pref = await prisma.notificationPreference.findFirst({
+    const prefs = await prisma.notificationPreference.findMany({
       where: {
         userId: Number(userId),
-        channel: "in_app",
         category,
         OR: orgId
           ? [{ orgId: Number(orgId) }, { orgId: null }]
           : [{ orgId: null }],
       },
-      // Prefer org-scoped row if both exist
       orderBy: { orgId: "desc" },
     });
 
-    // Explicit opt-out — skip the notification entirely.
-    if (pref && pref.enabled === false) return null;
+    // Check in_app preference
+    const inAppPref = prefs.find(p => p.channel === "in_app");
+    if (inAppPref && inAppPref.enabled === false) inAppEnabled = false;
+
+    // Check push preference
+    const pushPref = prefs.find(p => p.channel === "push");
+    if (pushPref && pushPref.enabled === false) pushEnabled = false;
+
+    // Check email preference
+    const emailPref = prefs.find(p => p.channel === "email");
+    if (emailPref && emailPref.enabled === false) emailEnabled = false;
   }
 
-  const notification = await prisma.notification.create({
-    data: { userId: Number(userId), type, message, link, metadata },
-  });
+  // Generate a friendly title
+  const title = category 
+    ? category.charAt(0).toUpperCase() + category.slice(1) + " Notification"
+    : "New Notification";
 
-  // Publish SSE event so the bell badge updates immediately.
-  eventBus.publish(`user:${userId}`, {
-    event: "notification.new",
-    payload: { id: notification.id, type, message, category },
-    at: new Date().toISOString(),
-  });
+  // 1. IN-APP NOTIFICATION
+  let notification = null;
+  if (inAppEnabled) {
+    notification = await prisma.notification.create({
+      data: { userId: Number(userId), type, message, link, metadata },
+    });
+
+    // Publish SSE event so the bell badge updates immediately.
+    eventBus.publish(`user:${userId}`, {
+      event: "notification.new",
+      payload: { id: notification.id, type, message, category },
+      at: new Date().toISOString(),
+    });
+  }
+
+  // 2. PUSH NOTIFICATION
+  if (pushEnabled) {
+    // Fire-and-forget push notification
+    sendPushNotification(userId, { 
+      title, 
+      body: message, 
+      icon: link 
+    }).catch(err => console.error("Failed to send push notification:", err));
+  }
+
+  // 3. EMAIL NOTIFICATION
+  if (emailEnabled) {
+    // Look up user's email address
+    prisma.user.findUnique({
+      where: { id: Number(userId) },
+      select: { email: true }
+    }).then(user => {
+      if (user && user.email) {
+        sendNotificationEmail(user.email, title, `${message}\n\nView details: ${link ? (process.env.FRONTEND_URL || 'http://localhost:5173') + link : 'Login to app'}`)
+          .catch(err => console.error("Failed to send email notification:", err));
+      }
+    }).catch(err => console.error("Failed to lookup user for email notification:", err));
+  }
 
   return notification;
 };
@@ -109,7 +155,8 @@ const markAllNotificationsRead = async (userId) => {
 
 module.exports = {
   createNotification,
-  createInAppNotification,
+  dispatchNotification,
+  createInAppNotification: dispatchNotification, // Alias for backward compatibility just in case
   markAllNotificationsRead,
   markNotificationRead,
 };

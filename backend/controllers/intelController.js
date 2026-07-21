@@ -1,7 +1,7 @@
 const { prisma } = require("../config/postgres");
 const intelService = require("../services/intelService");
 const { AppError } = require("../middleware/errorHandler");
-const { createInAppNotification } = require("../services/notificationService");
+const { dispatchNotification } = require("../services/notificationService");
 const { recordAudit } = require("../services/auditService");
 const { incrementUsage } = require("../services/usageService");
 const { publish } = require("../services/webhookService");
@@ -45,7 +45,7 @@ const searchIntel = asyncHandler(async (req, res) => {
   await incrementUsage({ userId: req.user.id, orgId: req.orgId, resource: "searches" });
 
   // 4. Send notification
-  await createInAppNotification({
+  await dispatchNotification({
     userId: req.user.id,
     orgId: req.orgId,
     type: "INTEL_SEARCH",

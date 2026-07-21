@@ -3,7 +3,7 @@ const { AppError } = require("../middleware/errorHandler");
 const asyncHandler = require("../utils/asyncHandler");
 const response = require("../utils/response");
 const inviteService = require("../services/inviteService");
-const { createInAppNotification } = require("../services/notificationService");
+const { dispatchNotification } = require("../services/notificationService");
 const { sendEmail, sendInviteEmail } = require("../utils/sendEmail");
 const slugify = require("../utils/slugify");
 const eventBus = require("../services/eventBus");
@@ -84,7 +84,7 @@ const updateMemberRole = asyncHandler(async (req, res) => {
     data: { role },
   });
 
-  await createInAppNotification({
+  await dispatchNotification({
     userId: member.id,
     orgId: req.orgId,
     type: "TEAM_ROLE_UPDATED",
@@ -144,7 +144,7 @@ const removeMember = asyncHandler(async (req, res) => {
     },
   });
 
-  await createInAppNotification({
+  await dispatchNotification({
     userId: member.id,
     orgId: req.orgId,
     type: "TEAM_MEMBER_REMOVED",
@@ -285,7 +285,7 @@ const acceptInvite = asyncHandler(async (req, res) => {
   });
 
   if (invite.invitedById) {
-    await createInAppNotification({
+    await dispatchNotification({
       userId: invite.invitedById,
       orgId: invite.orgId,
       type: "TEAM_MEMBER_ADDED",

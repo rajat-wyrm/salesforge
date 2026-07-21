@@ -3,7 +3,7 @@ const { AppError } = require("../middleware/errorHandler");
 const asyncHandler = require("../utils/asyncHandler");
 const response = require("../utils/response");
 const { getPlan, currentPeriod, checkLimit } = require("../utils/planLimits");
-const { createInAppNotification } = require("../services/notificationService");
+const { dispatchNotification } = require("../services/notificationService");
 const crypto = require("crypto");
 const Razorpay = require("razorpay");
 
@@ -82,7 +82,7 @@ const activatePlan = async ({ userId, orgId, plan, interval, price, paymentRef }
     });
   }
 
-  await createInAppNotification({
+  await dispatchNotification({
     userId,
     orgId,
     type: "BILLING_UPDATE",
@@ -147,7 +147,7 @@ const verifyPayment = asyncHandler(async (req, res) => {
     .digest("hex");
 
   if (expectedSignature !== razorpay_signature) {
-    await createInAppNotification({
+    await dispatchNotification({
       userId: req.user.id,
       orgId: req.orgId,
       type: "PAYMENT_FAILED",
@@ -160,7 +160,7 @@ const verifyPayment = asyncHandler(async (req, res) => {
 
   const sub = await activatePlan({ userId: req.user.id, orgId: req.orgId, plan, interval, price, paymentRef: razorpay_payment_id });
 
-  await createInAppNotification({
+  await dispatchNotification({
     userId: req.user.id,
     orgId: req.orgId,
     type: "PAYMENT_RECEIVED",
@@ -229,7 +229,7 @@ const createInvoice = asyncHandler(async (req, res) => {
     }
   });
 
-  await createInAppNotification({
+  await dispatchNotification({
     userId: req.user.id,
     orgId: req.orgId,
     type: "INVOICE_CREATED",
