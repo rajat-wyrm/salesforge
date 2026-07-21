@@ -162,12 +162,24 @@ const App = () => (
           <Route path="/settings/sessions" element={<Sessions />} />
           <Route path="/settings/2fa" element={<TwoFactor />} />
 
-          <Route path="/admin-dashboard" element={<RequireAdmin><AdminDashboard /></RequireAdmin>} />
-          <Route path="/admin" element={<Navigate to="/admin-dashboard" replace />} />
-
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/Maindashboard" element={<Navigate to="/dashboard" replace />} />
         </Route>
+
+        {/* Admin Dashboard (Standalone layout) */}
+        <Route 
+          path="/admin-dashboard" 
+          element={
+            <RequireAuth>
+              <ErrorBoundary>
+                <RequireAdmin>
+                  <AdminDashboard />
+                </RequireAdmin>
+              </ErrorBoundary>
+            </RequireAuth>
+          } 
+        />
+        <Route path="/admin" element={<Navigate to="/admin-dashboard" replace />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -16,7 +16,7 @@ const Login = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirect = searchParams.get("redirect") || "/dashboard";
-  const { isAuthenticated, loading, refresh } = useAuth();
+  const { isAuthenticated, loading, refresh, user } = useAuth();
 
   const [view, setView] = useState(VIEW.GOOGLE);
   const [error, setError] = useState(null);
@@ -28,8 +28,14 @@ const Login = () => {
   const [resetError, setResetError] = useState(null);
 
   useEffect(() => {
-    if (!loading && isAuthenticated) navigate(redirect, { replace: true });
-  }, [isAuthenticated, loading, navigate, redirect]);
+    if (!loading && isAuthenticated) {
+      if (user?.role === "ADMIN") {
+        navigate("/admin-dashboard", { replace: true });
+      } else {
+        navigate(redirect, { replace: true });
+      }
+    }
+  }, [isAuthenticated, loading, navigate, redirect, user]);
 
   /* ── Google OAuth ─────────────────────────────────────────── */
   const handleGoogleSuccess = async (credentialResponse) => {

@@ -7,10 +7,20 @@ import { useAuth } from "@/context/AuthContext";
 
 const AdminLogin = () => {
   const navigate = useNavigate();
-  const { refresh } = useAuth();
+  const { refresh, isAuthenticated, loading, user } = useAuth();
 
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!loading && isAuthenticated) {
+      if (user?.role === "ADMIN") {
+        navigate("/admin-dashboard", { replace: true });
+      } else {
+        navigate("/dashboard", { replace: true });
+      }
+    }
+  }, [isAuthenticated, loading, navigate, user]);
 
   const handleGoogleSuccess = async (credentialResponse) => {
     setError("");
@@ -23,21 +33,22 @@ const AdminLogin = () => {
 
       const data = res.data.data || res.data;
       const token = data.token;
-      const user = data.user;
+      const responseUser = data.user;
 
       // Store the token so the API client sends it on subsequent requests
       if (token) tokenStore.set(token);
 
       // Store admin info in localStorage for quick access
       localStorage.setItem("isLoggedIn", "true");
-      if (user?.email) localStorage.setItem("adminEmail", user.email);
-      if (user?.role) localStorage.setItem("userRole", user.role);
+      if (responseUser?.email) localStorage.setItem("adminEmail", responseUser.email);
+      if (responseUser?.role) localStorage.setItem("userRole", responseUser.role);
 
       // Refresh the auth context so RequireAuth/RequireAdmin guards work
-      await refresh();
+      const authData = await refresh();
+      const finalRole = authData?.user?.role || responseUser?.role;
 
       // Role-based redirect: ADMIN goes to admin-dashboard
-      if (user?.role === "ADMIN") {
+      if (finalRole === "ADMIN") {
         navigate("/admin-dashboard", { replace: true });
       } else {
         navigate("/dashboard", { replace: true });
