@@ -10,6 +10,7 @@ import CommandPalette from "@/components/CommandPalette";
 
 import Login from "../pages/Auth/Login";
 import AdminLogin from "../pages/Auth/AdminLogin";
+import AcceptInvite from "../pages/Auth/AcceptInvite";
 import Landing from "../pages/Landing/LandingPage";
 import DashboardLayout from "../components/layout/DashboardLayout";
 
@@ -82,6 +83,7 @@ const App = () => (
         <Route path="/register" element={<Navigate to="/login" replace />} />
         <Route path="/reset-password" element={<Navigate to="/login" replace />} />
         <Route path="/admin-login" element={<ErrorBoundary><AdminLogin /></ErrorBoundary>} />
+        <Route path="/invite/accept" element={<ErrorBoundary><AcceptInvite /></ErrorBoundary>} />
 
         <Route element={<RequireAuth><ErrorBoundary><DashboardLayout /></ErrorBoundary></RequireAuth>}>
           <Route path="/dashboard" element={<Dashboard />} />

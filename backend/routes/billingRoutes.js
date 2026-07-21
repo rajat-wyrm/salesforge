@@ -16,6 +16,7 @@ router.post("/razorpay/verify", permit("OWNER", "ADMIN"), ctrl.verifyPayment);
 router.post("/cancel", permit("OWNER"), ctrl.cancel);
 router.get("/payments", ctrl.listPayments);
 router.get("/usage", ctrl.usage);
+router.post("/invoice", permit("OWNER", "ADMIN"), ctrl.createInvoice);
 
 module.exports = router;
 

@@ -118,13 +118,33 @@ const NotificationPreferences = () => {
   const { darkMode } = s;
   const [prefs, setPrefs] = useState([]);
   const [loading, setLoading] = useState(true);
-  useEffect(() => { notificationPrefService.list().then(setPrefs).finally(() => setLoading(false)); }, []);
+  const [saving, setSaving] = useState(false);
+
+  const loadPrefs = () => {
+    setLoading(true);
+    notificationPrefService.list().then(setPrefs).finally(() => setLoading(false));
+  };
+
+  useEffect(() => { loadPrefs(); }, []);
 
   const toggle = async (pref) => {
-    const next = prefs.map((p) => p.channel === pref.channel && p.category === pref.category ? { ...p, enabled: !p.enabled } : p);
+    if (!pref || (!pref.channel && !pref.category)) return;
+    const next = prefs.map((p) =>
+      p.channel === pref.channel && p.category === pref.category
+        ? { ...p, enabled: !p.enabled }
+        : p
+    );
     setPrefs(next);
-    try { await notificationPrefService.update(next); }
-    catch (e) { toast.error(e.message); setPrefs(prefs); }
+    setSaving(true);
+    try {
+      await notificationPrefService.update(next.filter((p) => p.channel && p.category));
+      toast.success("Preference saved!");
+    } catch (e) {
+      toast.error(e.message || "Failed to save preference.");
+      setPrefs(prefs); // rollback
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) return <UptoSpinner />;

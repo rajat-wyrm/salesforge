@@ -1,5 +1,5 @@
 const { prisma } = require("../config/postgres");
-const { createNotification } = require("../services/notificationService");
+const { createInAppNotification } = require("../services/notificationService");
 const { updateLeadScore } = require("../services/leadScoringService");
 const { recordActivity, diffLead, summarizeChanges } = require("../services/leadActivityService");
 const asyncHandler = require("../utils/asyncHandler");
@@ -83,9 +83,11 @@ const createLead = asyncHandler(async (req, res) => {
   });
   await updateLeadScore(lead.id);
   const updated = await prisma.lead.findUnique({ where: { id: lead.id }, include: LEAD_INCLUDE });
-  await createNotification({
+  await createInAppNotification({
     userId: req.user.id,
+    orgId: req.orgId,
     type: "LEAD_CREATED",
+    category: "lead",
     message: `Lead ${lead.name} added to your pipeline.`,
     link: `/app/leads/${lead.id}`,
     metadata: { leadId: lead.id },

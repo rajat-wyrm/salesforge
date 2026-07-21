@@ -30,18 +30,18 @@ const Contracts = () => {
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!draft.title.trim()) {
-  toast.error("Title is required");
-  return;
+      toast.error("Title is required");
+      return;
+    }
 
-  if (
-  draft.startDate &&
-  draft.endDate &&
-  new Date(draft.endDate) < new Date(draft.startDate)
-) {
-  toast.error("End date must be after the start date");
-  return;
-}
-}
+    if (
+      draft.startDate &&
+      draft.endDate &&
+      new Date(draft.endDate) < new Date(draft.startDate)
+    ) {
+      toast.error("End date must be after the start date");
+      return;
+    }
     try {
       await contractService.create({ ...draft, value: Number(draft.value) });
       toast.success("Contract created");

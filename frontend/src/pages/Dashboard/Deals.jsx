@@ -14,7 +14,7 @@ import {
   UptoProgressBar,
 } from "@/components/UI/UptoHooks";
 import { openEventStream } from "@/lib/api";
-import { Briefcase, DollarSign, GripVertical, Plus } from "lucide-react";
+import { Briefcase, DollarSign, GripVertical, Plus, Edit2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 
@@ -41,6 +41,30 @@ const Deals = () => {
   const [createStage, setCreateStage] = useState(null);
   const [draft, setDraft] = useState({ title: "", amount: 0,probability: 50, expectedCloseAt: "",});
   const [draggingId, setDraggingId] = useState(null);
+  const [editId, setEditId] = useState(null);
+
+  const openEdit = (deal) => {
+    setEditId(deal.id);
+    setCreateStage(deal.stageId);
+    setDraft({ 
+      title: deal.title || "", 
+      amount: deal.amount || 0, 
+      probability: deal.probability ?? 50, 
+      expectedCloseAt: deal.expectedCloseAt ? deal.expectedCloseAt.substring(0, 10) : "" 
+    });
+    setShowCreate(true);
+  };
+
+  const removeDeal = async (id) => {
+    if (!confirm("Are you sure you want to delete this deal?")) return;
+    try {
+      await dealService.remove(id);
+      toast.success("Deal deleted");
+      load();
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
 
   const money = (value) => `$${Math.round(Number(value) || 0).toLocaleString()}`;
   const pipelineMetrics = {
@@ -98,10 +122,16 @@ const Deals = () => {
     }
 
     try {
-      await dealService.create({ ...draft, stageId: createStage });
-      toast.success("Deal created");
+      if (editId) {
+        await dealService.update(editId, { ...draft, stageId: createStage });
+        toast.success("Deal updated");
+      } else {
+        await dealService.create({ ...draft, stageId: createStage });
+        toast.success("Deal created");
+      }
       setShowCreate(false);
-      setDraft({ title: "", amount: 0 });
+      setEditId(null);
+      setDraft({ title: "", amount: 0, probability: 50, expectedCloseAt: "" });
       load();
     } catch (err) {
       toast.error(err.message);
@@ -142,6 +172,8 @@ const Deals = () => {
           <UptoButton
             disabled={!kanban.length}
             onClick={() => {
+              setEditId(null);
+              setDraft({ title: "", amount: 0, probability: 50, expectedCloseAt: "" });
               setCreateStage(kanban[0]?.id || null);
               setShowCreate(true);
             }}
@@ -201,13 +233,17 @@ const Deals = () => {
                       key={deal.id}
                       draggable
                       onDragStart={(e) => onDragStart(e, deal.id)}
-                      className={`cursor-grab rounded-xl border p-3 shadow-sm transition hover:shadow-md active:cursor-grabbing ${
+                      className={`group cursor-grab rounded-xl border p-3 shadow-sm transition hover:shadow-md active:cursor-grabbing ${
                         darkMode ? "border-slate-800 bg-slate-900" : "border-slate-100 bg-white"
                       } ${draggingId === deal.id ? "opacity-50" : ""}`}
                     >
                       <div className="mb-1 flex items-start justify-between gap-2">
                         <h4 className={`line-clamp-2 text-sm font-semibold ${s.heading}`}>{deal.title || "Untitled deal"}</h4>
-                        <GripVertical className="h-3 w-3 shrink-0 text-slate-300" />
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button type="button" onClick={(e) => { e.stopPropagation(); openEdit(deal); }} className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded"><Edit2 className="h-3 w-3 text-slate-400 hover:text-blue-500" /></button>
+                          <button type="button" onClick={(e) => { e.stopPropagation(); removeDeal(deal.id); }} className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded"><Trash2 className="h-3 w-3 text-slate-400 hover:text-red-500" /></button>
+                          <GripVertical className="h-3 w-3 shrink-0 text-slate-300" />
+                        </div>
                       </div>
                       <div className={`mb-2 flex items-center gap-1 text-xs ${s.body}`}>
                         <DollarSign className="h-3 w-3" /> {money(deal.amount).replace("$", "")}
@@ -232,7 +268,7 @@ const Deals = () => {
       {showCreate && (
         <section>
           <UptoCard>
-            <h3 className={`mb-4 text-base font-semibold ${s.heading}`}>New Deal</h3>
+            <h3 className={`mb-4 text-base font-semibold ${s.heading}`}>{editId ? "Edit Deal" : "New Deal"}</h3>
             <form onSubmit={create} className="space-y-3">
               <UptoInput label="Title *" value={draft.title} onChange={(e) => setDraft((p) => ({ ...p, title: e.target.value }))} required placeholder="Acme - Enterprise Plan" />
               <UptoInput
@@ -305,8 +341,8 @@ if (!isNaN(date.getTime()) && date.getFullYear() > 3000) {
 }}
                  />
               </div>
-              <div className="flex gap-2">
-                <UptoButton type="submit">Create Deal</UptoButton>
+              <div className="flex gap-2 mt-4">
+                <UptoButton type="submit">{editId ? "Save Changes" : "Create Deal"}</UptoButton>
                 <UptoButton type="button" variant="secondary" onClick={() => setShowCreate(false)}>Cancel</UptoButton>
               </div>
             </form>

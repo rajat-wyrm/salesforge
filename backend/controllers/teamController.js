@@ -3,7 +3,8 @@ const { AppError } = require("../middleware/errorHandler");
 const asyncHandler = require("../utils/asyncHandler");
 const response = require("../utils/response");
 const inviteService = require("../services/inviteService");
-const { sendEmail } = require("../utils/sendEmail");
+const { createInAppNotification } = require("../services/notificationService");
+const { sendEmail, sendInviteEmail } = require("../utils/sendEmail");
 const slugify = require("../utils/slugify");
 const eventBus = require("../services/eventBus");
 
@@ -83,6 +84,15 @@ const updateMemberRole = asyncHandler(async (req, res) => {
     data: { role },
   });
 
+  await createInAppNotification({
+    userId: member.id,
+    orgId: req.orgId,
+    type: "TEAM_ROLE_UPDATED",
+    category: "team",
+    message: `Your role has been updated to ${role}.`,
+    link: "/app/settings/team",
+  });
+
   return response.success(res, {
     message: "Role updated.",
   });
@@ -132,6 +142,15 @@ const removeMember = asyncHandler(async (req, res) => {
       userId: member.id,
       orgId: req.orgId,
     },
+  });
+
+  await createInAppNotification({
+    userId: member.id,
+    orgId: req.orgId,
+    type: "TEAM_MEMBER_REMOVED",
+    category: "team",
+    message: `You have been removed from the organization.`,
+    link: "/app/dashboard",
   });
 
   return response.success(res, {
@@ -214,18 +233,12 @@ const sendInvite = asyncHandler(async (req, res) => {
 
   const inviteUrl = `${frontendUrl}/invite/accept?token=${invite.token}`;
 
-  await sendEmail({
+  const emailResult = await sendInviteEmail({
     to: invite.email,
-    subject: `Join ${org?.name || "your team"} on SalesForge`,
-    html: `
-      <p>
-        ${req.user.name} invited you to join
-        <b>${org?.name || "their team"}</b> on SalesForge.
-      </p>
-      <p>Role: <b>${role}</b></p>
-      <p><a href="${inviteUrl}">Accept invite</a></p>
-      <p>This invite expires in 7 days.</p>
-    `,
+    inviterName: req.user.name,
+    orgName: org?.name || "your team",
+    role,
+    inviteUrl,
   });
 
   eventBus.publish(`org:${req.orgId}`, {
@@ -237,7 +250,11 @@ const sendInvite = asyncHandler(async (req, res) => {
     at: new Date().toISOString(),
   });
 
-  return response.created(res, invite);
+  return response.created(res, {
+    ...invite,
+    inviteUrl: emailResult.skipped ? inviteUrl : undefined,
+    emailSkipped: emailResult.skipped,
+  });
 });
 
 const revokeInvite = asyncHandler(async (req, res) => {
@@ -261,9 +278,22 @@ const acceptInvite = asyncHandler(async (req, res) => {
     payload: {
       userId: req.user.id,
       email: req.user.email,
+      name: req.user.name,
+      role: invite.role,
     },
     at: new Date().toISOString(),
   });
+
+  if (invite.invitedById) {
+    await createInAppNotification({
+      userId: invite.invitedById,
+      orgId: invite.orgId,
+      type: "TEAM_MEMBER_ADDED",
+      category: "team",
+      message: `${req.user.name || req.user.email} has accepted your team invite.`,
+      link: "/app/settings/team",
+    });
+  }
 
   return response.success(res, {
     message: "Invite accepted.",

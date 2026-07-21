@@ -1,6 +1,6 @@
 const dns = require("dns").promises;
 const { prisma } = require("../config/postgres");
-const { createNotification } = require("../services/notificationService");
+const { createInAppNotification } = require("../services/notificationService");
 const { recordAudit } = require("../services/auditService");
 const { incrementUsage } = require("../services/usageService");
 const { publish } = require("../services/webhookService");
@@ -41,9 +41,11 @@ const emailSearch = asyncHandler(async (req, res) => {
     data: { userId: req.user.id, orgId: req.orgId, type: "EMAIL_SEARCH", resource: "email" },
   });
   await incrementUsage({ userId: req.user.id, orgId: req.orgId, resource: "searches" });
-  await createNotification({
+  await createInAppNotification({
     userId: req.user.id,
+    orgId: req.orgId,
     type: "EMAIL_SEARCH",
+    category: "system",
     message: `Email lookup completed for ${email}.`,
     link: "/app/search/email",
     metadata: { deliverability, recordId: record.id },
