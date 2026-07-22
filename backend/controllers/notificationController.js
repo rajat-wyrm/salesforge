@@ -56,7 +56,23 @@ const testEmail = asyncHandler(async (req, res) => {
   const orgId = req.orgId || null;
   const lowerCategory = category.toLowerCase();
 
-  // 1. Read the logged-in user's preferences.
+  console.log(`[TestEmail] Flow Start - Authenticated User: ${userId}`);
+
+  // 1. Fetch user from database
+  const user = await prisma.user.findUnique({
+    where: { id: Number(userId) },
+    select: { id: true, email: true },
+  });
+
+  if (!user || !user.email) {
+    console.warn(`[TestEmail] User Email Missing for user ${userId}`);
+    return response.error(res, "Recipient user or email address not found in database.", 404);
+  }
+
+  console.log(`[TestEmail] User Email: ${user.email}`);
+  console.log(`[TestEmail] Notification Category: ${lowerCategory}`);
+
+  // 2. Read notification preferences
   const prefs = await prisma.notificationPreference.findMany({
     where: {
       userId: Number(userId),
@@ -68,52 +84,41 @@ const testEmail = asyncHandler(async (req, res) => {
     orderBy: { orgId: "desc" },
   });
 
-  // 2. Check the Email channel preference.
   const emailPref = prefs.find(p => p.channel === "email");
-  // Default to true if preference is not explicitly set to false
   const emailEnabled = !emailPref || emailPref.enabled !== false;
 
-  // 3. Respect the Email toggle.
+  console.log(`[TestEmail] Preference Read: ${prefs.length} record(s) found`);
+  console.log(`[TestEmail] Email Enabled: ${emailEnabled}`);
+
+  // 3. Respect Email toggle
   if (!emailEnabled) {
+    console.log(`[TestEmail] Email Disabled for category "${category}"`);
     return response.success(res, {
       success: false,
       message: `Email notifications are disabled for category "${category}".`,
-      sent: false
+      sent: false,
+      recipient: user.email,
     });
   }
 
-  // 4. Send email only when enabled.
-  const user = await prisma.user.findUnique({
-    where: { id: Number(userId) },
-    select: { email: true }
+  // 4. Dispatch email to recipient
+  const { dispatchNotification } = require("../services/notificationService");
+  await dispatchNotification({
+    userId,
+    orgId,
+    type: "SYSTEM_ALERT",
+    category: lowerCategory,
+    message: `${title}: ${message}`,
+    link: "/app",
+    metadata: { title },
   });
 
-  if (!user || !user.email) {
-    return response.error(res, "Recipient user or email address not found.", 404);
-  }
-
-  const emailService = require("../services/emailService");
-  const { compileTemplate } = require("../services/emailTemplates");
-  
-  // Format matching SYSTEM_ALERT or custom test layout
-  const { subject, html, text } = compileTemplate("SYSTEM_ALERT", message, null, { title });
-
-  const result = await emailService.send({
-    to: user.email,
-    subject: `${title} - Test`,
-    html,
-    text
+  return response.success(res, {
+    success: true,
+    message: `Test email sent successfully to ${user.email}.`,
+    sent: true,
+    recipient: user.email,
   });
-
-  if (result) {
-    return response.success(res, {
-      success: true,
-      message: "Test email sent successfully.",
-      sent: true
-    });
-  } else {
-    return response.error(res, "Failed to send test email.", 500);
-  }
 });
 
 module.exports = { listNotifications, readNotification, readAllNotifications, broadcast, testEmail };

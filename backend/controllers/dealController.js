@@ -258,6 +258,16 @@ const moveDeal = asyncHandler(async (req, res) => {
     include: { stageRef: true },
   });
   await publish({ orgId: req.orgId, event: "DEAL_STAGE_CHANGED", payload: { dealId: deal.id, stage: stage.name } });
+  const dealType = stage.isWon ? "DEAL_WON" : stage.isLost ? "DEAL_LOST" : "DEAL_STAGE_CHANGED";
+  await dispatchNotification({
+    userId: req.user.id,
+    orgId: req.orgId,
+    type: dealType,
+    category: "deal",
+    message: `Deal "${deal.title || 'Deal'}" moved to stage "${stage.name}".`,
+    link: `/app/deals/${deal.id}`,
+    metadata: { dealId: deal.id, dealTitle: deal.title, amount: updated.amount },
+  });
   return response.success(res, updated);
 });
 

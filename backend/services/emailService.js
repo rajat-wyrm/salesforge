@@ -35,7 +35,7 @@ const send = async ({ to, subject, html, text }) => {
     const transporter = createTransporter();
     
     await transporter.sendMail({
-      from: `"SalesForge Notifications" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      from: process.env.EMAIL_FROM || `"SalesForge Notifications" <${process.env.EMAIL_USER}>`,
       to,
       subject,
       text: text || "",

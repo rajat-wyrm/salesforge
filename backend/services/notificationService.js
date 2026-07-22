@@ -59,6 +59,23 @@ const dispatchNotification = async ({
 }) => {
   if (!userId) return null;
 
+  console.log(`[NotificationService] Authenticated User: ${userId}`);
+
+  // Fetch user from database
+  const user = await prisma.user.findUnique({
+    where: { id: Number(userId) },
+    select: { id: true, email: true, name: true },
+  });
+
+  if (user && user.email) {
+    console.log(`[NotificationService] User Email: ${user.email}`);
+  } else {
+    console.warn(`[NotificationService] User Email Missing: User ${userId} has no email address`);
+  }
+
+  const categoryName = category ? category.toLowerCase() : "general";
+  console.log(`[NotificationService] Notification Category: ${categoryName}`);
+
   let inAppEnabled = true;
   let pushEnabled = true;
   let emailEnabled = true;
@@ -76,6 +93,8 @@ const dispatchNotification = async ({
       orderBy: { orgId: "desc" },
     });
 
+    console.log(`[NotificationService] Preference Read: ${prefs.length} record(s) found for category "${categoryName}"`);
+
     // Check in_app preference
     const inAppPref = prefs.find(p => p.channel === "in_app");
     if (inAppPref && inAppPref.enabled === false) inAppEnabled = false;
@@ -87,7 +106,11 @@ const dispatchNotification = async ({
     // Check email preference
     const emailPref = prefs.find(p => p.channel === "email");
     if (emailPref && emailPref.enabled === false) emailEnabled = false;
+  } else {
+    console.log(`[NotificationService] Preference Read: Default preferences (enabled)`);
   }
+
+  console.log(`[NotificationService] Email Enabled: ${emailEnabled}`);
 
   // Generate a friendly title
   const title = category 
@@ -120,28 +143,30 @@ const dispatchNotification = async ({
   }
 
   // 3. EMAIL NOTIFICATION
-  if (emailEnabled) {
+  if (!emailEnabled) {
+    console.log(`[NotificationService] Email Disabled for user ${userId} and category "${categoryName}"`);
+  } else if (!user || !user.email) {
+    console.warn(`[NotificationService] User Email Missing for user ${userId}. Skipping email.`);
+  } else {
     try {
-      const user = await prisma.user.findUnique({
-        where: { id: Number(userId) },
-        select: { email: true }
+      console.log(`[NotificationService] Generating Template for type "${type}"`);
+      const { subject, html, text } = compileTemplate(type, message, link, metadata);
+
+      console.log(`[NotificationService] Sending Email to ${user.email}`);
+      const success = await send({
+        to: user.email,
+        subject,
+        html,
+        text,
       });
-      if (user && user.email) {
-        // Compile specific template styled with branding, action button, footer, etc.
-        const { subject, html, text } = compileTemplate(type, message, link, metadata);
-        
-        // Dispatch the email
-        await send({
-          to: user.email,
-          subject,
-          html,
-          text,
-        });
+
+      if (success) {
+        console.log(`[NotificationService] Email Sent Successfully to ${user.email}`);
       } else {
-        console.warn(`[NotificationService] No email found for user ${userId}. Skipping email.`);
+        console.error(`[NotificationService] SMTP Failure for ${user.email}`);
       }
     } catch (err) {
-      console.error("[NotificationService] Failed to send email notification:", err);
+      console.error(`[NotificationService] SMTP Failure for ${user ? user.email : userId}:`, err);
       // Continue the remaining notification pipeline even when SMTP/email flow fails.
     }
   }

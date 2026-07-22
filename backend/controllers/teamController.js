@@ -250,6 +250,16 @@ const sendInvite = asyncHandler(async (req, res) => {
     at: new Date().toISOString(),
   });
 
+  await dispatchNotification({
+    userId: req.user.id,
+    orgId: req.orgId,
+    type: "TEAM_MEMBER_INVITED",
+    category: "team",
+    message: `Invitation sent to ${invite.email} for role ${role}.`,
+    link: "/app/settings/team",
+    metadata: { email: invite.email, role },
+  });
+
   return response.created(res, {
     ...invite,
     inviteUrl: emailResult.skipped ? inviteUrl : undefined,

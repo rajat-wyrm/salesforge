@@ -254,6 +254,15 @@ const deleteLead = asyncHandler(async (req, res) => {
     metadata: { name: lead.name },
   });
   await publish({ orgId: req.orgId, event: "LEAD_DELETED", payload: { leadId: lead.id, name: lead.name } });
+  await dispatchNotification({
+    userId: req.user.id,
+    orgId: req.orgId,
+    type: "LEAD_DELETED",
+    category: "lead",
+    message: `Lead ${lead.name} was deleted.`,
+    link: "/app/leads",
+    metadata: { leadId: lead.id, leadName: lead.name },
+  });
   return response.success(res, { message: "Lead deleted." });
 });
 

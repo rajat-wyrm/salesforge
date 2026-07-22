@@ -155,11 +155,59 @@ const compileTemplate = (type, message, link, metadata = {}) => {
       break;
     }
 
+    case "LEAD_UPDATED": {
+      const name = metadata.leadName || metadata.name || 'Lead';
+      title = "Lead Updated";
+      bodyHtml = `
+        <p>A lead in your pipeline has been updated.</p>
+        <p><strong>Lead Name:</strong> ${name}</p>
+        <p><strong>Details:</strong> ${message}</p>
+      `;
+      actionText = "View Lead";
+      break;
+    }
+
+    case "LEAD_DELETED": {
+      const name = metadata.leadName || metadata.name || 'Lead';
+      title = "Lead Deleted";
+      bodyHtml = `
+        <p>A lead has been deleted from your organization.</p>
+        <p><strong>Lead Name:</strong> ${name}</p>
+        <p><strong>Details:</strong> ${message}</p>
+      `;
+      actionText = "View Dashboard";
+      break;
+    }
+
+    case "DEAL_CREATED": {
+      title = "New Deal Created";
+      bodyHtml = `
+        <p>A new deal has been created in your pipeline.</p>
+        <p><strong>Deal Name/Title:</strong> ${metadata.dealTitle || metadata.title || 'Deal'}</p>
+        <p><strong>Deal Amount:</strong> ${metadata.amount ? '$' + metadata.amount : 'N/A'}</p>
+        <p><strong>Details:</strong> ${message}</p>
+      `;
+      actionText = "View Deal";
+      break;
+    }
+
+    case "DEAL_STAGE_CHANGED":
+    case "DEAL_UPDATED": {
+      title = "Deal Updated";
+      bodyHtml = `
+        <p>An update has occurred on a deal in your sales pipeline.</p>
+        <p><strong>Deal Title:</strong> ${metadata.dealTitle || metadata.title || 'Deal'}</p>
+        <p><strong>Details:</strong> ${message}</p>
+      `;
+      actionText = "View Deal";
+      break;
+    }
+
     case "DEAL_WON":
       title = "Deal Won! 🎉";
       bodyHtml = `
         <p>Congratulations! A deal has been closed successfully as won.</p>
-        <p><strong>Deal Name/Title:</strong> ${metadata.dealTitle || 'Deal'}</p>
+        <p><strong>Deal Name/Title:</strong> ${metadata.dealTitle || metadata.title || 'Deal'}</p>
         <p><strong>Deal Amount:</strong> ${metadata.amount ? '$' + metadata.amount : 'N/A'}</p>
         <p><strong>Message:</strong> ${message}</p>
       `;
@@ -170,7 +218,7 @@ const compileTemplate = (type, message, link, metadata = {}) => {
       title = "Deal Lost";
       bodyHtml = `
         <p>A deal has been closed and marked as lost.</p>
-        <p><strong>Deal Name/Title:</strong> ${metadata.dealTitle || 'Deal'}</p>
+        <p><strong>Deal Name/Title:</strong> ${metadata.dealTitle || metadata.title || 'Deal'}</p>
         <p><strong>Deal Amount:</strong> ${metadata.amount ? '$' + metadata.amount : 'N/A'}</p>
         <p><strong>Details:</strong> ${message}</p>
       `;
@@ -198,6 +246,18 @@ const compileTemplate = (type, message, link, metadata = {}) => {
       actionText = "View Payments";
       break;
 
+    case "PAYMENT_FAILED":
+      title = "Payment Failed";
+      bodyHtml = `
+        <p>An attempted payment transaction has failed.</p>
+        <p><strong>Amount:</strong> ${metadata.amount ? '$' + metadata.amount : 'N/A'}</p>
+        <p><strong>Reason:</strong> ${message}</p>
+        <p>Please check your billing and payment method settings.</p>
+      `;
+      actionText = "Update Billing Info";
+      break;
+
+    case "TEAM_MEMBER_INVITED":
     case "TEAM_INVITATION":
     case "TEAM_INVITE":
       title = "Team Invitation";
@@ -218,6 +278,45 @@ const compileTemplate = (type, message, link, metadata = {}) => {
         <p><strong>Details:</strong> ${message}</p>
       `;
       actionText = "View Team";
+      break;
+
+    case "ROLE_CHANGED":
+    case "TEAM_ROLE_UPDATED":
+      title = "Team Role Updated";
+      bodyHtml = `
+        <p>Your access role in your organization has been updated.</p>
+        <p><strong>Details:</strong> ${message}</p>
+      `;
+      actionText = "View Team Settings";
+      break;
+
+    case "LOGIN_ALERT":
+      title = "Security Alert: New Login";
+      bodyHtml = `
+        <p>A new login session was detected on your account.</p>
+        <p><strong>Details:</strong> ${message}</p>
+        <p>If this was not you, please secure your account immediately.</p>
+      `;
+      actionText = "Manage Security Settings";
+      break;
+
+    case "PASSWORD_CHANGED":
+      title = "Password Changed";
+      bodyHtml = `
+        <p>Your account password was recently changed.</p>
+        <p><strong>Details:</strong> ${message}</p>
+        <p>If you did not make this change, please contact support or reset your password immediately.</p>
+      `;
+      actionText = "Account Security";
+      break;
+
+    case "MAINTENANCE_NOTICE":
+      title = "System Maintenance Notice";
+      bodyHtml = `
+        <p>Scheduled maintenance notification for SalesForge CRM.</p>
+        <p><strong>Notice:</strong> ${message}</p>
+      `;
+      actionText = "View System Status";
       break;
 
     case "SYSTEM_ALERT":
