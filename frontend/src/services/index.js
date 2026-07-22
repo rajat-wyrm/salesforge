@@ -466,3 +466,8 @@ export const intelService = {
   saved: () => unwrap(api.get("/intel/saved")),
   saveQuery: (data) => unwrap(api.post("/intel/saved", data)),
 };
+
+export const userService = {
+  me: () => unwrap(api.get("/users/me")),
+  update: (data) => unwrap(api.patch("/users/me", data)),
+};
