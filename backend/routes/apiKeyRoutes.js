@@ -10,8 +10,7 @@ router.use(protect, tenantScope);
 
 router.get("/", ctrl.list);
 router.post("/", permit("OWNER", "ADMIN"), enforcePlanLimit("apiKeys", "API keys"), ctrl.create);
-router.patch("/:id", permit("OWNER", "ADMIN"), ctrl.update);
-router.post("/:id/regenerate", permit("OWNER", "ADMIN"), ctrl.regenerate);
 router.delete("/:id", permit("OWNER", "ADMIN"), ctrl.revoke);
+router.patch("/:id", permit("OWNER", "ADMIN"), ctrl.updateApiKey);
 
 module.exports = router;
