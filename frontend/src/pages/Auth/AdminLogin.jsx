@@ -188,7 +188,7 @@ const AdminLogin = () => {
                 theme="outline"
                 size="large"
                 text="continue_with"
-                width="100%"
+                width="280"
               />
             </div>
 
