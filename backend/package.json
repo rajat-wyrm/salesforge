@@ -10,9 +10,6 @@
     "prisma:generate": "prisma generate",
     "prisma:seed": "node prisma/seed.js"
   },
-  "prisma": {
-    "seed": "node prisma/seed.js"
-  },
   "keywords": [],
   "author": "",
   "license": "ISC",
