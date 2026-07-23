@@ -1,9 +1,9 @@
 import React, { useState } from "react";
+import { Outlet } from "react-router-dom";
 import AdminSidebar from "../../components/admin/AdminSidebar";
 import AdminHeader from "../../components/admin/AdminHeader";
-import AdminMainLayout from "../../components/admin/AdminMainLayout";
 
-const AdminDashboard = ({ onLogout, userEmail }) => {
+const AdminDashboard = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   return (
@@ -11,12 +11,10 @@ const AdminDashboard = ({ onLogout, userEmail }) => {
       <AdminSidebar
         isSidebarOpen={isSidebarOpen}
         setIsSidebarOpen={setIsSidebarOpen}
-        onLogout={onLogout}
-        userEmail={userEmail}
       />
       <div className="flex-1 flex flex-col h-screen overflow-hidden relative bg-slate-50">
         <AdminHeader />
-        <AdminMainLayout />
+        <Outlet />
         {isSidebarOpen && (
           <div
             className="fixed inset-0 bg-black/50 z-0 md:hidden"

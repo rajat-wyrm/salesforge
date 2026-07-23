@@ -31,6 +31,11 @@ import { ApiKeys, Webhooks } from "../pages/Dashboard/ApiKeys";
 import { Usage, Audit, Sessions, TwoFactor } from "../pages/Dashboard/Settings";
 import { Changelog, Onboarding, NotificationPreferences, DataExport } from "../pages/Dashboard/Extras";
 import AdminDashboard from "../pages/Dashboard/AdminDashboard";
+import AdminMainLayout from "../components/admin/AdminMainLayout";
+import AdminUsers from "../components/admin/AdminUsers";
+import AdminServerHealth from "../components/admin/AdminServerHealth";
+import AdminAuditLogs from "../components/admin/AdminAuditLogs";
+import AdminSettings from "../components/admin/AdminSettings";
 import Quotes from "../pages/Dashboard/Quotes";
 import QuoteDetail from "../pages/Dashboard/QuoteDetail";
 import Products from "../pages/Dashboard/Products";
@@ -166,9 +171,9 @@ const App = () => (
           <Route path="/Maindashboard" element={<Navigate to="/dashboard" replace />} />
         </Route>
 
-        {/* Admin Dashboard (Standalone layout) */}
-        <Route 
-          path="/admin-dashboard" 
+        {/* Admin Dashboard with nested sub-pages */}
+        <Route
+          path="/admin"
           element={
             <RequireAuth>
               <ErrorBoundary>
@@ -177,9 +182,16 @@ const App = () => (
                 </RequireAdmin>
               </ErrorBoundary>
             </RequireAuth>
-          } 
-        />
-        <Route path="/admin" element={<Navigate to="/admin-dashboard" replace />} />
+          }
+        >
+          <Route index element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="dashboard" element={<AdminMainLayout />} />
+          <Route path="users" element={<AdminUsers />} />
+          <Route path="server-health" element={<AdminServerHealth />} />
+          <Route path="audit-logs" element={<AdminAuditLogs />} />
+          <Route path="settings" element={<AdminSettings />} />
+        </Route>
+        <Route path="/admin-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -216,7 +228,7 @@ const RootRedirect = () => {
   );
   if (isAuthenticated) {
     // Role-based redirect: ADMIN users go to admin dashboard
-    if (user?.role === "ADMIN") return <Navigate to="/admin-dashboard" replace />;
+    if (user?.role === "ADMIN") return <Navigate to="/admin/dashboard" replace />;
     return <Navigate to="/dashboard" replace />;
   }
   return <ErrorBoundary><Landing /></ErrorBoundary>;

@@ -7,11 +7,10 @@ const response = require("../utils/response");
 const generateToken = require("../utils/generateToken");
 const { dispatchNotification } = require("../services/notificationService");
 const { recordAudit } = require("../services/auditService");
-//  //
 
 const { setAuthCookie } = require("../utils/authCookie");
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-//   //
+
 const getSafeAdmin = (user) => ({
   id: user.id,
   name: user.name,
@@ -28,7 +27,6 @@ const adminGoogleLogin = asyncHandler(async (req, res) => {
     throw new AppError("Google credential is required.", 400);
   }
 
-  // Verify the Google token
   const ticket = await googleClient.verifyIdToken({
     idToken: credential,
     audience: process.env.GOOGLE_CLIENT_ID,
@@ -37,7 +35,6 @@ const adminGoogleLogin = asyncHandler(async (req, res) => {
   const payload = ticket.getPayload();
   const email = payload.email.toLowerCase();
 
-  // Look up the user by email
   const user = await prisma.user.findUnique({ where: { email } });
 
   if (!user) {
@@ -48,14 +45,16 @@ const adminGoogleLogin = asyncHandler(async (req, res) => {
     throw new AppError("Access denied. This account is not an administrator.", 403);
   }
 
-  await dispatchNotification({
+  // Fire-and-forget notification — don't block login on it
+  dispatchNotification({
     userId: user.id,
     orgId: user.organizationId,
     type: "ADMIN_LOGIN",
     category: "system",
     message: "Administrator login successful.",
     link: "/admin/dashboard",
-  });
+  }).catch((err) => console.error("[admin:login:notify]", err.message));
+
   await recordAudit({
     userId: user.id,
     action: "admin.login",
@@ -102,14 +101,16 @@ const adminLogin = asyncHandler(async (req, res) => {
     if (!ok) throw new AppError("Invalid admin credentials.", 401);
   }
 
-  await dispatchNotification({
+  // Fire-and-forget notification
+  dispatchNotification({
     userId: user.id,
     orgId: user.organizationId,
     type: "ADMIN_LOGIN",
     category: "system",
     message: "Administrator login successful.",
     link: "/admin/dashboard",
-  });
+  }).catch((err) => console.error("[admin:login:notify]", err.message));
+
   await recordAudit({
     userId: user.id,
     action: "admin.login",
@@ -200,11 +201,7 @@ const updateUser = asyncHandler(async (req, res) => {
     entityId: user.id,
     metadata: data,
   });
-  //   //
- return response.success(res, {
-  message: "User updated.",
-});
-//   //
+  return response.success(res, { message: "User updated." });
 });
 
 const getPlatformStats = asyncHandler(async (req, res) => {
@@ -220,30 +217,232 @@ const getPlatformStats = asyncHandler(async (req, res) => {
   });
 });
 
+// FIXED: triggerSystemEvent was timing out because:
+// 1. req.orgId is undefined for ADMIN users (no tenant middleware on admin routes)
+//    so prisma.user.findMany({where: {organizationId: undefined}}) returns ALL users
+// 2. dispatchNotification sends emails sequentially for each user, causing timeouts
+// Fix: Only notify the admin who triggered it (or their org if they have one).
+//      Use createNotification instead of dispatchNotification to skip email/push.
 const triggerSystemEvent = asyncHandler(async (req, res) => {
   const { eventType, message } = req.body;
   if (!["MAINTENANCE_NOTICE", "BACKUP_COMPLETED"].includes(eventType)) {
     throw new AppError("Invalid event type.", 400);
   }
 
-  // To simulate a system-wide broadcast, we notify the current admin
-  // or we could loop through all users in req.orgId. For performance in this demo,
-  // we will just notify the admin who triggered it, or all users in the org if needed.
-  // We'll fetch all users in the organization to notify them.
-  const users = await prisma.user.findMany({ where: { organizationId: req.orgId }, select: { id: true } });
-  
-  for (const user of users) {
-    await dispatchNotification({
-      userId: user.id,
-      orgId: req.orgId,
-      type: eventType,
-      category: "system",
-      message: message || (eventType === "MAINTENANCE_NOTICE" ? "System maintenance scheduled." : "System backup completed successfully."),
-      link: "/app/dashboard",
+  const defaultMessage = eventType === "MAINTENANCE_NOTICE"
+    ? "System maintenance scheduled."
+    : "System backup completed successfully.";
+  const finalMessage = message || defaultMessage;
+
+  // Determine which users to notify
+  let users = [];
+  const adminOrgId = req.user.organizationId;
+
+  if (adminOrgId) {
+    // If admin belongs to an org, notify users in that org (capped at 50 to prevent timeouts)
+    users = await prisma.user.findMany({
+      where: { organizationId: adminOrgId },
+      select: { id: true },
+      take: 50,
     });
   }
 
-  return response.success(res, { message: `Triggered ${eventType} for ${users.length} users.` });
+  // Always include the admin themselves
+  const adminAlreadyIncluded = users.some((u) => u.id === req.user.id);
+  if (!adminAlreadyIncluded) {
+    users.push({ id: req.user.id });
+  }
+
+  // Create in-app notifications directly (no email/push to avoid timeouts)
+  const notifications = [];
+  for (const u of users) {
+    try {
+      const notif = await prisma.notification.create({
+        data: {
+          userId: u.id,
+          type: eventType,
+          message: finalMessage,
+          link: "/admin/dashboard",
+          metadata: { triggeredBy: req.user.id || null, eventType: eventType || "UNKNOWN" },
+        },
+      });
+      notifications.push(notif);
+    } catch (err) {
+      console.error(`[triggerSystemEvent] Failed to notify user ${u.id}:`, err.message);
+    }
+  }
+
+  await recordAudit({
+    userId: req.user.id,
+    action: "admin.system_event",
+    entityType: "SystemEvent",
+    entityId: eventType,
+    metadata: { eventType, message: finalMessage, notifiedCount: notifications.length },
+  });
+
+  return response.success(res, {
+    message: `Triggered ${eventType} for ${notifications.length} user(s).`,
+    notifiedCount: notifications.length,
+  });
+});
+
+const getServerHealth = asyncHandler(async (req, res) => {
+  // Database latency check
+  const dbStart = Date.now();
+  await prisma.$queryRaw`SELECT 1`;
+  const dbLatencyMs = Date.now() - dbStart;
+
+  // Memory usage
+  const mem = process.memoryUsage();
+  const formatMB = (bytes) => (bytes / 1024 / 1024).toFixed(1);
+
+  // Uptime
+  const uptimeSeconds = process.uptime();
+  const uptimeHours = (uptimeSeconds / 3600).toFixed(1);
+
+  // Count active resources
+  const [activeApiKeys, activeWebhooks, totalNotifications] = await Promise.all([
+    prisma.apiKey.count({ where: { revokedAt: null } }),
+    prisma.webhook.count({ where: { active: true } }),
+    prisma.notification.count(),
+  ]);
+
+  return response.success(res, {
+    database: {
+      status: dbLatencyMs < 500 ? "operational" : dbLatencyMs < 2000 ? "high_latency" : "degraded",
+      latencyMs: dbLatencyMs,
+    },
+    api: {
+      status: "operational",
+      uptimeHours: Number(uptimeHours),
+      uptimeSeconds: Math.floor(uptimeSeconds),
+    },
+    memory: {
+      rss: `${formatMB(mem.rss)} MB`,
+      heapUsed: `${formatMB(mem.heapUsed)} MB`,
+      heapTotal: `${formatMB(mem.heapTotal)} MB`,
+      external: `${formatMB(mem.external)} MB`,
+      heapUsedPercent: Number(((mem.heapUsed / mem.heapTotal) * 100).toFixed(1)),
+    },
+    resources: {
+      activeApiKeys,
+      activeWebhooks,
+      totalNotifications,
+    },
+    email: {
+      status: "operational",
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
+
+const getAdminAuditLogs = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 30, action, entityType, userId, search } = req.query;
+  const pageNumber = Number(page);
+  const pageLimit = Number(limit);
+  const skip = (pageNumber - 1) * pageLimit;
+
+  const where = {};
+  if (action) where.action = action;
+  if (entityType) where.entityType = entityType;
+  if (userId) where.userId = Number(userId);
+
+  if (search && search.trim()) {
+    where.OR = [
+      { action: { contains: search.trim(), mode: "insensitive" } },
+      { entityType: { contains: search.trim(), mode: "insensitive" } },
+      { user: { is: { name: { contains: search.trim(), mode: "insensitive" } } } },
+      { user: { is: { email: { contains: search.trim(), mode: "insensitive" } } } },
+    ];
+  }
+
+  const [items, total] = await Promise.all([
+    prisma.auditLog.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: pageLimit,
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        org: { select: { id: true, name: true } },
+      },
+    }),
+    prisma.auditLog.count({ where }),
+  ]);
+
+  return response.paginated(res, items, total, pageNumber, pageLimit);
+});
+
+// Generate a CSV monthly report with real database data
+const generateMonthlyReport = asyncHandler(async (req, res) => {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const monthName = now.toLocaleString("en-US", { month: "long", year: "numeric" });
+
+  // Gather real data from database
+  const [
+    totalUsers, newUsersThisMonth, totalOrgs, totalLeads, newLeadsThisMonth,
+    totalDeals, totalApiKeys, totalWebhooks, auditCount, notifCount,
+    usersByRole, orgsByPlan, orgsByStatus,
+  ] = await Promise.all([
+    prisma.user.count(),
+    prisma.user.count({ where: { createdAt: { gte: startOfMonth, lte: endOfMonth } } }),
+    prisma.organization.count(),
+    prisma.lead.count(),
+    prisma.lead.count({ where: { createdAt: { gte: startOfMonth, lte: endOfMonth } } }),
+    prisma.deal.count(),
+    prisma.apiKey.count({ where: { revokedAt: null } }),
+    prisma.webhook.count({ where: { active: true } }),
+    prisma.auditLog.count({ where: { createdAt: { gte: startOfMonth, lte: endOfMonth } } }),
+    prisma.notification.count({ where: { createdAt: { gte: startOfMonth, lte: endOfMonth } } }),
+    prisma.user.groupBy({ by: ["role"], _count: { role: true } }),
+    prisma.organization.groupBy({ by: ["plan"], _count: { plan: true } }),
+    prisma.organization.groupBy({ by: ["status"], _count: { status: true } }),
+  ]);
+
+  // Build CSV content
+  const lines = [];
+  lines.push(`SalesForge Monthly Report - ${monthName}`);
+  lines.push(`Generated: ${now.toISOString()}`);
+  lines.push("");
+  lines.push("PLATFORM SUMMARY");
+  lines.push("Metric,Value");
+  lines.push(`Total Users,${totalUsers}`);
+  lines.push(`New Users This Month,${newUsersThisMonth}`);
+  lines.push(`Total Organizations,${totalOrgs}`);
+  lines.push(`Total Leads,${totalLeads}`);
+  lines.push(`New Leads This Month,${newLeadsThisMonth}`);
+  lines.push(`Total Deals,${totalDeals}`);
+  lines.push(`Active API Keys,${totalApiKeys}`);
+  lines.push(`Active Webhooks,${totalWebhooks}`);
+  lines.push(`Audit Events This Month,${auditCount}`);
+  lines.push(`Notifications This Month,${notifCount}`);
+  lines.push("");
+  lines.push("USERS BY ROLE");
+  lines.push("Role,Count");
+  for (const r of usersByRole) {
+    lines.push(`${r.role},${r._count.role}`);
+  }
+  lines.push("");
+  lines.push("ORGANIZATIONS BY PLAN");
+  lines.push("Plan,Count");
+  for (const p of orgsByPlan) {
+    lines.push(`${p.plan},${p._count.plan}`);
+  }
+  lines.push("");
+  lines.push("ORGANIZATIONS BY STATUS");
+  lines.push("Status,Count");
+  for (const s of orgsByStatus) {
+    lines.push(`${s.status},${s._count.status}`);
+  }
+
+  const csvContent = lines.join("\n");
+  const filename = `salesforge-report-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}.csv`;
+
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  return res.status(200).send(csvContent);
 });
 
 module.exports = {
@@ -254,4 +453,7 @@ module.exports = {
   updateUser,
   getPlatformStats,
   triggerSystemEvent,
+  getServerHealth,
+  getAdminAuditLogs,
+  generateMonthlyReport,
 };

@@ -17,7 +17,7 @@ const AdminLogin = () => {
   useEffect(() => {
     if (!loading && isAuthenticated) {
       if (user?.role === "ADMIN") {
-        navigate("/admin-dashboard", { replace: true });
+        navigate("/admin/dashboard", { replace: true });
       } else {
         navigate("/dashboard", { replace: true });
       }
@@ -35,11 +35,18 @@ const AdminLogin = () => {
     if (responseUser?.email) localStorage.setItem("adminEmail", responseUser.email);
     if (responseUser?.role) localStorage.setItem("userRole", responseUser.role);
 
-    const authData = await refresh();
-    const finalRole = authData?.user?.role || responseUser?.role;
+    // refresh() calls /auth/me — if it fails for admin users (e.g. no org),
+    // still navigate based on the login response's role data.
+    let finalRole = responseUser?.role;
+    try {
+      const authData = await refresh();
+      if (authData?.user?.role) finalRole = authData.user.role;
+    } catch (err) {
+      console.warn("[AdminLogin] refresh() failed, using login response role:", err?.message);
+    }
 
     if (finalRole === "ADMIN") {
-      navigate("/admin-dashboard", { replace: true });
+      navigate("/admin/dashboard", { replace: true });
     } else {
       navigate("/dashboard", { replace: true });
     }

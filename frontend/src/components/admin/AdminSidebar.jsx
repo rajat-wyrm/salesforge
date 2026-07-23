@@ -1,5 +1,4 @@
 import {
-  ChevronLeft,
   ChevronsLeft,
   ChevronsRight,
   FileText,
@@ -12,31 +11,28 @@ import {
   X,
 } from "lucide-react";
 import React from "react";
+import { NavLink, useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
-const getNameFromEmail = (email) => {
-  if (!email) return "Administrator";
+const AdminSidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
-  const namePart = email.split("@")[0];
-  const cleaned = namePart.replace(/[^a-zA-Z]/g, " ");
-  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
-};
-
-const AdminSidebar = ({
-  isSidebarOpen,
-  setIsSidebarOpen,
-  onLogout,
-  userEmail,
-}) => {
   const navItems = [
-    { name: "System Overview", icon: LayoutDashboard, active: true },
-    { name: "User Management", icon: Users, active: false },
-    { name: "Server Health", icon: Server, active: false },
-    { name: "Audit Logs", icon: FileText, active: false },
-    { name: "Global Settings", icon: Settings, active: false },
+    { name: "System Overview", icon: LayoutDashboard, to: "/admin/dashboard" },
+    { name: "User Management", icon: Users, to: "/admin/users" },
+    { name: "Server Health", icon: Server, to: "/admin/server-health" },
+    { name: "Audit Logs", icon: FileText, to: "/admin/audit-logs" },
+    { name: "Global Settings", icon: Settings, to: "/admin/settings" },
   ];
 
-  // Use email to get name, or fallback to Administrator
-  const adminName = userEmail ? getNameFromEmail(userEmail) : "Administrator";
+  const adminName = user?.name || "Administrator";
+  const userEmail = user?.email || "";
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login", { replace: true });
+  };
 
   return (
     <>
@@ -50,13 +46,13 @@ const AdminSidebar = ({
       </button>
 
       <aside
-        className={`fixed md:static inset-y-0 left-0 z-10 flex flex-col bg-white text-white border-r border-slate-800 transition-all duration-300 ease-in-out ${
+        className={`fixed md:static inset-y-0 left-0 z-10 flex flex-col bg-white text-white border-r border-slate-200 transition-all duration-300 ease-in-out ${
           isSidebarOpen
             ? "translate-x-0 w-64"
             : "-translate-x-full w-0 md:w-20 md:translate-x-0"
         }`}
       >
-        <div className="flex items-center justify-between p-4 h-16 border-b border-slate-800">
+        <div className="flex items-center justify-between p-4 h-16 border-b border-slate-200">
           <div
             className={`transition-all duration-300 overflow-hidden ${
               isSidebarOpen ? "opacity-100 w-32" : "opacity-0 w-0"
@@ -65,13 +61,13 @@ const AdminSidebar = ({
             <img
               src="/image 2.jpg"
               alt="Logo"
-              className="w-full h-auto object-contain bg-slate-900"
+              className="w-full h-auto object-contain"
             />
           </div>
 
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="hidden md:block p-1 rounded-full text-slate-400 hover:bg-slate-800"
+            className="hidden md:block p-1 rounded-full text-slate-400 hover:bg-slate-100"
           >
             {isSidebarOpen ? (
               <ChevronsLeft size={20} />
@@ -81,9 +77,9 @@ const AdminSidebar = ({
           </button>
         </div>
 
-        <div className="flex items-center gap-3 p-4 mt-4 border-b border-slate-800 mx-2">
-          <div className="w-10 h-10 rounded-full bg-teal-600 flex items-center justify-center font-bold text-slate-900 shadow-lg shadow-teal-900/50">
-            {adminName.charAt(0)}
+        <div className="flex items-center gap-3 p-4 mt-4 border-b border-slate-200 mx-2">
+          <div className="w-10 h-10 rounded-full bg-teal-600 flex items-center justify-center font-bold text-white shadow-lg shadow-teal-900/20 shrink-0">
+            {adminName.charAt(0).toUpperCase()}
           </div>
           <div
             className={`transition-opacity duration-300 overflow-hidden ${
@@ -94,7 +90,7 @@ const AdminSidebar = ({
               {adminName}
             </span>
             <span
-              className="block text-xs text-slate-900 truncate w-40"
+              className="block text-xs text-slate-500 truncate w-40"
               title={userEmail}
             >
               {userEmail}
@@ -104,14 +100,16 @@ const AdminSidebar = ({
 
         <nav className="flex-1 px-2 py-4 space-y-1">
           {navItems.map((item) => (
-            <a
+            <NavLink
               key={item.name}
-              href="#"
-              className={`flex items-center p-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                item.active
-                  ? "bg-teal-600 text-white shadow-lg shadow-teal-900/20"
-                  : "text-slate-400 hover:bg-slate-800 hover:text-white"
-              } ${isSidebarOpen ? "justify-start" : "justify-center"}`}
+              to={item.to}
+              className={({ isActive }) =>
+                `flex items-center p-3 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                  isActive
+                    ? "bg-teal-600 text-white shadow-lg shadow-teal-900/20"
+                    : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                } ${isSidebarOpen ? "justify-start" : "justify-center"}`
+              }
             >
               <item.icon
                 size={20}
@@ -124,14 +122,14 @@ const AdminSidebar = ({
               >
                 {item.name}
               </span>
-            </a>
+            </NavLink>
           ))}
         </nav>
 
-        <div className="p-2 border-t border-slate-800">
+        <div className="p-2 border-t border-slate-200">
           <button
-            onClick={onLogout}
-            className={`w-full flex items-center p-3 rounded-lg text-sm font-medium text-red-400 hover:bg-slate-900 ${
+            onClick={handleLogout}
+            className={`w-full flex items-center p-3 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 transition-colors ${
               isSidebarOpen ? "justify-start" : "justify-center"
             }`}
           >
