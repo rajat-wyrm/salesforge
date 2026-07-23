@@ -4,6 +4,7 @@
   "description": "",
   "main": "server.js",
   "scripts": {
+    "build": "npm run prisma:generate",
     "test": "node --test test/*.js",
     "start": "node server.js",
     "dev": "nodemon server.js",
