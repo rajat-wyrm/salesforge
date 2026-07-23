@@ -5,6 +5,8 @@
   "description": "SalesForge full-stack workspace",
   "scripts": {
     "install:all": "npm --prefix backend install && npm --prefix frontend install",
+    "install": "npm --prefix backend install",
+    "build": "cd frontend && npm install && npm run build",
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "build:frontend": "npm --prefix frontend run build",
