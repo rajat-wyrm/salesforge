@@ -84,10 +84,14 @@ const createLead = asyncHandler(async (req, res) => {
   await updateLeadScore(lead.id);
   const updated = await prisma.lead.findUnique({ where: { id: lead.id }, include: LEAD_INCLUDE });
   
-  // Notify the assigned owner (if any), otherwise notify the creator
-  const targetUserId = lead.ownerId ? lead.ownerId : req.user.id;
+  // ---------------------------------------------------------------------------
+  // NOTIFICATION: Always notify the AUTHENTICATED USER who triggered this event.
+  // userId must come from req.user.id (verified JWT session) — never from
+  // req.body.userId or any client-supplied field. The user's own preference
+  // toggles determine whether they receive in-app, email, or push notifications.
+  // ---------------------------------------------------------------------------
   await dispatchNotification({
-    userId: targetUserId,
+    userId: req.user.id,
     orgId: req.orgId,
     type: "LEAD_CREATED",
     category: "lead",
@@ -95,6 +99,10 @@ const createLead = asyncHandler(async (req, res) => {
     link: `/app/leads/${lead.id}`,
     metadata: { leadId: lead.id, leadName: lead.name },
   });
+  // TODO: Add similar dispatchNotification calls for:
+  //   - BILLING category: in billingController after payment/invoice events
+  //   - TEAM category:    in teamController after invite/join/role-change events
+  //   - SYSTEM category:  in adminController for system-wide alerts
   await recordActivity({
     leadId: lead.id,
     userId: req.user.id,

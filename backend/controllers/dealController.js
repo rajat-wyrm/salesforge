@@ -165,8 +165,14 @@ const createDeal = asyncHandler(async (req, res) => {
   });
   await recordAudit({ userId: req.user.id, orgId: req.orgId, action: "deal.create", entityType: "Deal", entityId: deal.id, metadata: { amount, title } });
   await publish({ orgId: req.orgId, event: "DEAL_CREATED", payload: { dealId: deal.id, title, amount } });
+  // ---------------------------------------------------------------------------
+  // NOTIFICATION: Always notify the AUTHENTICATED USER who triggered this event.
+  // userId must come from req.user.id (verified JWT session) — never from
+  // req.body or deal.ownerId. The user's own preference toggles determine
+  // whether they receive in-app, email, or push notifications.
+  // ---------------------------------------------------------------------------
   await dispatchNotification({
-    userId: deal.ownerId ? deal.ownerId : req.user.id,
+    userId: req.user.id,
     orgId: req.orgId,
     type: "DEAL_CREATED",
     category: "deal",

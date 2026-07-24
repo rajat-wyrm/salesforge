@@ -66,4 +66,56 @@ const update = asyncHandler(async (req, res) => {
   return response.success(res, { message: "Preferences saved." });
 });
 
-module.exports = { list, update };
+// ---------------------------------------------------------------------------
+// PATCH single preference toggle.
+// Body: { category, channel, enabled }
+// Always scoped to req.user.id — never reads userId from the request body.
+// ---------------------------------------------------------------------------
+const patchOne = asyncHandler(async (req, res) => {
+  const { category, channel, enabled } = req.body;
+  if (!category || !channel || enabled === undefined) {
+    throw new AppError("category, channel, and enabled are required.", 400);
+  }
+
+  const effectiveOrgId = req.orgId || null;
+
+  if (effectiveOrgId) {
+    await prisma.notificationPreference.upsert({
+      where: {
+        userId_orgId_channel_category: {
+          userId: req.user.id,
+          orgId: effectiveOrgId,
+          channel: channel.toLowerCase(),
+          category: category.toLowerCase(),
+        },
+      },
+      create: {
+        userId: req.user.id,
+        orgId: effectiveOrgId,
+        channel: channel.toLowerCase(),
+        category: category.toLowerCase(),
+        enabled: !!enabled,
+      },
+      update: { enabled: !!enabled },
+    });
+  } else {
+    // User-only (no org) — findFirst + upsert workaround since null breaks unique key
+    const existing = await prisma.notificationPreference.findFirst({
+      where: { userId: req.user.id, orgId: null, channel: channel.toLowerCase(), category: category.toLowerCase() },
+    });
+    if (existing) {
+      await prisma.notificationPreference.update({
+        where: { id: existing.id },
+        data: { enabled: !!enabled },
+      });
+    } else {
+      await prisma.notificationPreference.create({
+        data: { userId: req.user.id, orgId: null, channel: channel.toLowerCase(), category: category.toLowerCase(), enabled: !!enabled },
+      });
+    }
+  }
+
+  return response.success(res, { message: "Preference updated.", category, channel, enabled: !!enabled });
+});
+
+module.exports = { list, update, patchOne };

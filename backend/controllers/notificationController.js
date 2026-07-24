@@ -46,6 +46,16 @@ const broadcast = asyncHandler(async (req, res) => {
   return response.success(res, { sent: userIds.length });
 });
 
+// ---------------------------------------------------------------------------
+// [DEV ONLY] Test email notification endpoint.
+// Verifies the full notification pipeline for a given category:
+//   (a) toggle OFF → zero emails sent
+//   (b) toggle ON  → exactly one email sent to req.user.id's registered email
+//   (c) recipient is always the authenticated user, never anyone else
+//
+// Usage: POST /api/notifications/test-email
+// Body:  { category: "lead", title: "Test", message: "Hello" }
+// ---------------------------------------------------------------------------
 const testEmail = asyncHandler(async (req, res) => {
   const { category, title, message } = req.body;
   if (!category || !title || !message) {
@@ -56,21 +66,25 @@ const testEmail = asyncHandler(async (req, res) => {
   const orgId = req.orgId || null;
   const lowerCategory = category.toLowerCase();
 
-  console.log(`[TestEmail] Flow Start - Authenticated User: ${userId}`);
+  const diagnostics = {
+    authenticatedUserId: userId,
+    category: lowerCategory,
+    steps: [],
+  };
 
-  // 1. Fetch user from database
+  // 1. Fetch user from database — NEVER trust request body for email
   const user = await prisma.user.findUnique({
     where: { id: Number(userId) },
-    select: { id: true, email: true },
+    select: { id: true, email: true, name: true },
   });
 
   if (!user || !user.email) {
-    console.warn(`[TestEmail] User Email Missing for user ${userId}`);
+    diagnostics.steps.push("FAIL: User or email not found in database");
     return response.error(res, "Recipient user or email address not found in database.", 404);
   }
 
-  console.log(`[TestEmail] User Email: ${user.email}`);
-  console.log(`[TestEmail] Notification Category: ${lowerCategory}`);
+  diagnostics.recipientEmail = user.email;
+  diagnostics.steps.push(`User fetched from DB: ${user.email}`);
 
   // 2. Read notification preferences
   const prefs = await prisma.notificationPreference.findMany({
@@ -87,21 +101,25 @@ const testEmail = asyncHandler(async (req, res) => {
   const emailPref = prefs.find(p => p.channel === "email");
   const emailEnabled = !emailPref || emailPref.enabled !== false;
 
-  console.log(`[TestEmail] Preference Read: ${prefs.length} record(s) found`);
-  console.log(`[TestEmail] Email Enabled: ${emailEnabled}`);
+  diagnostics.preferencesFound = prefs.length;
+  diagnostics.emailPreferenceRow = emailPref || "none (defaults to enabled)";
+  diagnostics.emailEnabled = emailEnabled;
+  diagnostics.steps.push(`Preferences: ${prefs.length} row(s), email=${emailEnabled}`);
 
   // 3. Respect Email toggle
   if (!emailEnabled) {
-    console.log(`[TestEmail] Email Disabled for category "${category}"`);
+    diagnostics.steps.push("SKIPPED: Email toggle is OFF for this category");
+    diagnostics.emailSent = false;
     return response.success(res, {
-      success: false,
       message: `Email notifications are disabled for category "${category}".`,
       sent: false,
-      recipient: user.email,
+      diagnostics,
     });
   }
 
-  // 4. Dispatch email to recipient
+  // 4. Dispatch via the full notification pipeline
+  diagnostics.steps.push("Dispatching via notificationService.dispatchNotification()...");
+
   const { dispatchNotification } = require("../services/notificationService");
   await dispatchNotification({
     userId,
@@ -113,13 +131,15 @@ const testEmail = asyncHandler(async (req, res) => {
     metadata: { title },
   });
 
+  diagnostics.steps.push(`Email dispatched to ${user.email}`);
+  diagnostics.emailSent = true;
+
   return response.success(res, {
-    success: true,
-    message: `Test email sent successfully to ${user.email}.`,
+    message: `[DEV ONLY] Test email sent successfully to ${user.email}.`,
     sent: true,
     recipient: user.email,
+    diagnostics,
   });
 });
 
 module.exports = { listNotifications, readNotification, readAllNotifications, broadcast, testEmail };
-

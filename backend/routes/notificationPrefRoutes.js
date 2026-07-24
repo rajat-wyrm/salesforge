@@ -8,5 +8,6 @@ router.use(protect, tenantScope);
 
 router.get("/", ctrl.list);
 router.put("/", ctrl.update);
+router.patch("/", ctrl.patchOne);
 
 module.exports = router;

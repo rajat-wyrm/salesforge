@@ -39,8 +39,20 @@ const createNotification = async ({
 // Preferred helper: respects the user's preferences for all channels
 // before creating and broadcasting the notification.
 //
+// SECURITY NOTE:
+// userId here must ALWAYS be the ID of the user who triggered the event,
+// taken from their authenticated session (req.user.id) — never a different
+// user's ID, never from req.body, never hardcoded, never from an
+// environment variable. The caller is responsible for passing the correct
+// userId from the authentication middleware.
+//
+// The recipient EMAIL is ALWAYS fetched fresh from the database using the
+// passed userId — never taken from the request body, never cached from an
+// earlier request. EMAIL_USER / EMAIL_PASS env vars are ONLY the sending
+// account's SMTP login credentials and must never be used as a recipient.
+//
 // @param {object} opts
-//   - userId    {number}  – recipient
+//   - userId    {number}  – the authenticated user who triggered the event
 //   - orgId     {number}  – used to look up org-scoped preference
 //   - type      {string}  – notification type enum (e.g. "LEAD_CREATED")
 //   - category  {string}  – preference category: lead|deal|billing|team|system
@@ -61,7 +73,10 @@ const dispatchNotification = async ({
 
   console.log(`[NotificationService] Authenticated User: ${userId}`);
 
-  // Fetch user from database
+  // -------------------------------------------------------------------------
+  // SECURITY: Always re-fetch the user from the database to get their current
+  // email address. Never trust an email from the request payload or a cache.
+  // -------------------------------------------------------------------------
   const user = await prisma.user.findUnique({
     where: { id: Number(userId) },
     select: { id: true, email: true, name: true },
@@ -143,6 +158,22 @@ const dispatchNotification = async ({
   }
 
   // 3. EMAIL NOTIFICATION
+  // -------------------------------------------------------------------------
+  // TODO: BullMQ — When you add Redis (REDIS_URL), replace the inline email
+  // send below with:
+  //   const { emailQueue } = require("../queues/emailQueue");
+  //   await emailQueue.add("send-notification-email", {
+  //     userId,       // worker will re-fetch user.email from DB
+  //     category: categoryName,
+  //     type,
+  //     message,
+  //     link,
+  //     metadata,
+  //   });
+  // Then create a separate workers/emailWorker.js process that consumes the
+  // queue and sends emails via Nodemailer. Deploy it as a Render Background
+  // Worker with the same env vars as the web service.
+  // -------------------------------------------------------------------------
   if (!emailEnabled) {
     console.log(`[NotificationService] Email Disabled for user ${userId} and category "${categoryName}"`);
   } else if (!user || !user.email) {
@@ -152,6 +183,8 @@ const dispatchNotification = async ({
       console.log(`[NotificationService] Generating Template for type "${type}"`);
       const { subject, html, text } = compileTemplate(type, message, link, metadata);
 
+      // SECURITY: 'to' is ALWAYS user.email (fetched fresh from DB above).
+      // EMAIL_USER is ONLY the sender account — never the recipient.
       console.log(`[NotificationService] Sending Email to ${user.email}`);
       const success = await send({
         to: user.email,

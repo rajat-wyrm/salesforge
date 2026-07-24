@@ -69,6 +69,27 @@ const acceptPendingInviteForUser = async (userId, email) => {
   }
 };
 
+// ---------------------------------------------------------------------------
+// Seed default notification preferences for a newly registered user.
+// Creates 15 rows: 5 categories × 3 channels, all enabled by default.
+// ---------------------------------------------------------------------------
+const NOTIFICATION_CATEGORIES = ["lead", "deal", "billing", "team", "system"];
+const NOTIFICATION_CHANNELS = ["in_app", "email", "push"];
+
+const seedDefaultPreferences = async (userId, orgId = null) => {
+  const rows = [];
+  for (const category of NOTIFICATION_CATEGORIES) {
+    for (const channel of NOTIFICATION_CHANNELS) {
+      rows.push({ userId, orgId, channel, category, enabled: true });
+    }
+  }
+  // Use createMany with skipDuplicates so re-running is safe.
+  await prisma.notificationPreference.createMany({
+    data: rows,
+    skipDuplicates: true,
+  });
+};
+
 const register = asyncHandler(async (req, res) => {
   const email = req.body.email.toLowerCase();
   const password = await bcrypt.hash(req.body.password, 12);
@@ -151,6 +172,10 @@ const register = asyncHandler(async (req, res) => {
 
   // Auto-accept any other pending invites matching this email.
   await acceptPendingInviteForUser(user.id, user.email);
+
+  // Seed default notification preferences (5 categories × 3 channels = 15 rows, all enabled).
+  const finalUser = await prisma.user.findUnique({ where: { id: user.id } });
+  await seedDefaultPreferences(user.id, finalUser.organizationId);
 
   if (user.organizationId) {
     await prisma.subscription.upsert({
@@ -523,6 +548,9 @@ const googleLogin = asyncHandler(async (req, res) => {
     await prisma.orgMembership.create({
       data: { userId: user.id, orgId: org.id, role: "OWNER" },
     });
+
+    // Seed default notification preferences for the new Google user.
+    await seedDefaultPreferences(user.id, org.id);
   }
 
   const session = await sessionService.createSession({
