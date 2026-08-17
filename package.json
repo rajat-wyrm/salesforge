@@ -5,6 +5,7 @@
   "description": "SalesForge full-stack workspace",
   "scripts": {
     "build": "cd frontend && npm install && npm run build",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "install:all": "npm --prefix backend install && npm --prefix frontend install",
     "install": "npm --prefix backend install",
     "postinstall": "npm --prefix backend run prisma:generate",
@@ -21,5 +22,8 @@
   },
   "dependencies": {
     "razorpay": "^2.9.8"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.4"
   }
 }
