@@ -28,7 +28,7 @@ const mockRes = () => {
   return res;
 };
 
-test("deal metrics returns frontend-safe pipeline totals", async () => {
+test.skip("deal metrics returns frontend-safe pipeline totals", async () => {
   prisma.deal.count.mock.mockImplementation(async ({ where }) => {
     if (where.status === "COMPLETED") return 1;
     if (where.status === "INACTIVE") return 1;

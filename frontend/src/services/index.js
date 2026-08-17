@@ -107,6 +107,8 @@ export const notificationService = {
   list: (params) => unwrap(api.get("/notifications", { params })),
   markRead: (id) => unwrap(api.patch(`/notifications/${id}/read`)),
   markAllRead: () => unwrap(api.patch("/notifications/read-all")),
+  remove: (id) => unwrap(api.delete(`/notifications/${id}`)),
+  removeAll: () => unwrap(api.delete("/notifications")),
   unreadCount: async () => {
     const data = await unwrap(api.get("/notifications", { params: { limit: 1 } }));
     return data?.summary?.unreadCount || 0;

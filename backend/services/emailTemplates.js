@@ -1,10 +1,23 @@
 /**
- * Renders the base HTML structure for SalesForge notifications.
- * Uses a professional gradient header, Inter font family, clear action button, and custom footer.
+ * Email template compiler for SalesForge notifications.
+ *
+ * INBOX DELIVERY RULES — all templates must follow these to avoid Gmail spam:
+ *  ✗  No money/currency symbols in subject ($, ₹, €)
+ *  ✗  No spam words: "failed", "alert", "warning", "urgent", "verify", "free"
+ *  ✗  No exclamation marks in subjects  (Deal Won! → Deal closed as won)
+ *  ✗  No ALL-CAPS words in subject or body
+ *  ✗  No "immediately", "click here", "limited time", "act now"
+ *  ✗  Plain-text body must be substantive — never just a bare URL
+ *  ✓  Subject always prefixed with [SalesForge] for consistent sender identity
+ *  ✓  Reply-To should be set in the sending service
+ */
+
+/**
+ * Renders the base HTML email layout.
  */
 const getBaseLayout = (title, bodyHtml, actionText, actionUrl, frontendUrl) => {
   return `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -18,18 +31,14 @@ const getBaseLayout = (title, bodyHtml, actionText, actionUrl, frontendUrl) => {
       padding: 0;
       -webkit-font-smoothing: antialiased;
     }
-    .wrapper {
-      width: 100%;
-      background-color: #f8fafc;
-      padding: 40px 0;
-    }
+    .wrapper { width: 100%; background-color: #f8fafc; padding: 40px 0; }
     .container {
       max-width: 600px;
       margin: 0 auto;
       background: #ffffff;
       border-radius: 16px;
       overflow: hidden;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
       border: 1px solid #e2e8f0;
     }
     .header {
@@ -44,36 +53,32 @@ const getBaseLayout = (title, bodyHtml, actionText, actionUrl, frontendUrl) => {
       letter-spacing: -0.5px;
       text-decoration: none;
     }
-    .content {
-      padding: 40px 32px;
-    }
+    .content { padding: 40px 32px; }
     .title {
-      font-size: 22px;
+      font-size: 20px;
       font-weight: 700;
       color: #0f172a;
       margin-top: 0;
       margin-bottom: 16px;
     }
-    .message {
-      font-size: 16px;
-      line-height: 1.6;
+    .body-text {
+      font-size: 15px;
+      line-height: 1.65;
       color: #475569;
-      margin-bottom: 32px;
+      margin-bottom: 28px;
     }
-    .button-container {
-      text-align: center;
-      margin-bottom: 16px;
-    }
-    .button {
+    .body-text p { margin: 0 0 12px; }
+    .body-text strong { color: #1e293b; }
+    .btn-wrap { text-align: center; margin-bottom: 16px; }
+    .btn {
       display: inline-block;
-      background-color: #e76937;
+      background-color: #17AA97;
       color: #ffffff !important;
       font-weight: 600;
       font-size: 15px;
-      padding: 14px 32px;
+      padding: 13px 32px;
       text-decoration: none !important;
       border-radius: 8px;
-      box-shadow: 0 4px 6px rgba(231, 105, 87, 0.2);
     }
     .footer {
       background-color: #f1f5f9;
@@ -83,10 +88,7 @@ const getBaseLayout = (title, bodyHtml, actionText, actionUrl, frontendUrl) => {
       color: #64748b;
       border-top: 1px solid #e2e8f0;
     }
-    .footer a {
-      color: #17AA97;
-      text-decoration: none;
-    }
+    .footer a { color: #17AA97; text-decoration: none; }
   </style>
 </head>
 <body>
@@ -97,14 +99,18 @@ const getBaseLayout = (title, bodyHtml, actionText, actionUrl, frontendUrl) => {
       </div>
       <div class="content">
         <h2 class="title">${title}</h2>
-        <div class="message">${bodyHtml}</div>
-        <div class="button-container">
-          <a href="${actionUrl}" class="button" target="_blank">${actionText}</a>
+        <div class="body-text">${bodyHtml}</div>
+        <div class="btn-wrap">
+          <a href="${actionUrl}" class="btn" target="_blank">${actionText}</a>
         </div>
       </div>
       <div class="footer">
-        <p>This email was sent by SalesForge CRM. You received this because you have email notifications enabled.</p>
-        <p><a href="${frontendUrl}/notifications-prefs">Manage Preferences</a> &bull; <a href="${frontendUrl}">Visit Dashboard</a></p>
+        <p>You received this because you have email notifications enabled in SalesForge.</p>
+        <p>
+          <a href="${frontendUrl}/notifications-prefs">Manage preferences</a>
+          &bull;
+          <a href="${frontendUrl}">Visit dashboard</a>
+        </p>
         <p>&copy; 2026 SalesForge. All rights reserved.</p>
       </div>
     </div>
@@ -114,228 +120,266 @@ const getBaseLayout = (title, bodyHtml, actionText, actionUrl, frontendUrl) => {
 };
 
 /**
- * Compiles a template based on the type of notification.
- * 
- * @param {string} type - The notification/event type (e.g. LEAD_CREATED, DEAL_WON).
- * @param {string} message - Plaintext notification message.
- * @param {string|null} link - Action button link suffix.
- * @param {object} metadata - Extra details (e.g. lead name, amount).
- * @returns {object} { subject, html, text }
+ * Compiles an inbox-safe notification email for the given event type.
+ *
+ * @param {string} type       - Notification type enum (e.g. "LEAD_CREATED")
+ * @param {string} message    - Plain-text notification message
+ * @param {string|null} link  - Relative path for the action button (e.g. "/app/leads/1")
+ * @param {object} metadata   - Extra data (leadName, dealTitle, amount, …)
+ * @returns {{ subject: string, html: string, text: string }}
  */
 const compileTemplate = (type, message, link, metadata = {}) => {
   const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-  const actionUrl = link ? `${frontendUrl}${link}` : `${frontendUrl}/app`;
+  const actionUrl   = link ? `${frontendUrl}${link}` : `${frontendUrl}/app`;
 
-  let title = "Notification Alert";
-  let bodyHtml = `<p>${message}</p>`;
-  let actionText = "View Details";
+  let title      = "SalesForge account update";
+  let bodyHtml   = `<p>${message}</p>`;
+  let actionText = "View in SalesForge";
 
   switch (type) {
+
+    // ── LEAD ─────────────────────────────────────────────────────────────────
     case "LEAD_ASSIGNED": {
-      const name = metadata.leadName || metadata.name || (message ? message.replace(/^Lead\s+/, '').replace(/\s+(added|assigned|was).*/i, '') : 'Not specified');
-      title = "New Lead Assigned";
+      const name = metadata.leadName || metadata.name || "a contact";
+      title = "A lead has been assigned to you";
       bodyHtml = `
-        <p>A new lead has been assigned to you. Review their details to begin engagement.</p>
-        <p><strong>Lead Name:</strong> ${name}</p>
-        <p><strong>Details:</strong> ${message}</p>
-      `;
-      actionText = "View Lead Details";
+        <p>A new contact has been assigned to you in SalesForge. Review their profile and start building the relationship.</p>
+        <p><strong>Contact:</strong> ${name}</p>
+        <p>${message}</p>`;
+      actionText = "Open Lead";
       break;
     }
 
     case "LEAD_CREATED": {
-      const name = metadata.leadName || metadata.name || (message ? message.replace(/^Lead\s+/, '').replace(/\s+(added|assigned|was).*/i, '') : 'Not specified');
-      title = "New Lead Created";
+      const name = metadata.leadName || metadata.name || "a contact";
+      title = "New lead added to your pipeline";
       bodyHtml = `
-        <p>A new lead has been successfully added to the organization pipeline.</p>
-        <p><strong>Lead Name:</strong> ${name}</p>
-        <p><strong>Message:</strong> ${message}</p>
-      `;
-      actionText = "View Lead";
+        <p>A new contact has been added to your SalesForge pipeline and is ready for follow-up.</p>
+        <p><strong>Contact:</strong> ${name}</p>
+        <p>${message}</p>`;
+      actionText = "Open Lead";
       break;
     }
 
     case "LEAD_UPDATED": {
-      const name = metadata.leadName || metadata.name || 'Lead';
-      title = "Lead Updated";
+      const name = metadata.leadName || metadata.name || "A contact";
+      title = "Lead profile updated";
       bodyHtml = `
-        <p>A lead in your pipeline has been updated.</p>
-        <p><strong>Lead Name:</strong> ${name}</p>
-        <p><strong>Details:</strong> ${message}</p>
-      `;
-      actionText = "View Lead";
+        <p>${name}'s profile in your pipeline has been updated.</p>
+        <p>${message}</p>`;
+      actionText = "View Changes";
       break;
     }
 
     case "LEAD_DELETED": {
-      const name = metadata.leadName || metadata.name || 'Lead';
-      title = "Lead Deleted";
+      const name = metadata.leadName || metadata.name || "A contact";
+      title = "Lead removed from pipeline";
       bodyHtml = `
-        <p>A lead has been deleted from your organization.</p>
-        <p><strong>Lead Name:</strong> ${name}</p>
-        <p><strong>Details:</strong> ${message}</p>
-      `;
-      actionText = "View Dashboard";
+        <p>${name} has been removed from your SalesForge pipeline.</p>
+        <p>${message}</p>`;
+      actionText = "View Pipeline";
       break;
     }
 
-    case "DEAL_CREATED": {
-      title = "New Deal Created";
+    case "LEAD_FOLLOWUP": {
+      const name = metadata.leadName || metadata.name || "a contact";
+      title = "Follow-up reminder";
       bodyHtml = `
-        <p>A new deal has been created in your pipeline.</p>
-        <p><strong>Deal Name/Title:</strong> ${metadata.dealTitle || metadata.title || 'Deal'}</p>
-        <p><strong>Deal Amount:</strong> ${metadata.amount ? '$' + metadata.amount : 'N/A'}</p>
-        <p><strong>Details:</strong> ${message}</p>
-      `;
-      actionText = "View Deal";
+        <p>This is a friendly reminder to follow up with ${name}.</p>
+        <p>${message}</p>`;
+      actionText = "Open Contact";
+      break;
+    }
+
+    // ── DEAL ─────────────────────────────────────────────────────────────────
+    case "DEAL_CREATED": {
+      const dealTitle = metadata.dealTitle || metadata.title || "a deal";
+      title = `New deal added: ${dealTitle}`;
+      bodyHtml = `
+        <p>A new deal has been added to your SalesForge pipeline.</p>
+        <p><strong>Deal:</strong> ${dealTitle}</p>
+        <p>${message}</p>`;
+      actionText = "Open Deal";
       break;
     }
 
     case "DEAL_STAGE_CHANGED":
     case "DEAL_UPDATED": {
-      title = "Deal Updated";
+      const dealTitle = metadata.dealTitle || metadata.title || "A deal";
+      title = `Deal update: ${dealTitle}`;
       bodyHtml = `
-        <p>An update has occurred on a deal in your sales pipeline.</p>
-        <p><strong>Deal Title:</strong> ${metadata.dealTitle || metadata.title || 'Deal'}</p>
-        <p><strong>Details:</strong> ${message}</p>
-      `;
+        <p>There has been a change to <strong>${dealTitle}</strong> in your pipeline.</p>
+        <p>${message}</p>`;
+      actionText = "Open Deal";
+      break;
+    }
+
+    case "DEAL_WON": {
+      const dealTitle = metadata.dealTitle || metadata.title || "A deal";
+      title = `Deal closed as won: ${dealTitle}`;
+      bodyHtml = `
+        <p>Great news — <strong>${dealTitle}</strong> has been closed and marked as won.</p>
+        <p>${message}</p>`;
       actionText = "View Deal";
       break;
     }
 
-    case "DEAL_WON":
-      title = "Deal Won! 🎉";
+    case "DEAL_LOST": {
+      const dealTitle = metadata.dealTitle || metadata.title || "A deal";
+      title = `Deal closed: ${dealTitle}`;
       bodyHtml = `
-        <p>Congratulations! A deal has been closed successfully as won.</p>
-        <p><strong>Deal Name/Title:</strong> ${metadata.dealTitle || metadata.title || 'Deal'}</p>
-        <p><strong>Deal Amount:</strong> ${metadata.amount ? '$' + metadata.amount : 'N/A'}</p>
-        <p><strong>Message:</strong> ${message}</p>
-      `;
-      actionText = "View Deal Details";
+        <p><strong>${dealTitle}</strong> has been closed and marked as inactive in your pipeline.</p>
+        <p>${message}</p>`;
+      actionText = "View Pipeline";
       break;
+    }
 
-    case "DEAL_LOST":
-      title = "Deal Lost";
+    // ── BILLING ──────────────────────────────────────────────────────────────
+    case "INVOICE_CREATED": {
+      title = "Your SalesForge invoice is ready";
       bodyHtml = `
-        <p>A deal has been closed and marked as lost.</p>
-        <p><strong>Deal Name/Title:</strong> ${metadata.dealTitle || metadata.title || 'Deal'}</p>
-        <p><strong>Deal Amount:</strong> ${metadata.amount ? '$' + metadata.amount : 'N/A'}</p>
-        <p><strong>Details:</strong> ${message}</p>
-      `;
-      actionText = "View Deal Details";
-      break;
-
-    case "INVOICE_CREATED":
-      title = "New Invoice Created";
-      bodyHtml = `
-        <p>A new invoice has been generated for your organization.</p>
-        <p><strong>Invoice Number:</strong> ${metadata.invoiceNumber || 'N/A'}</p>
-        <p><strong>Invoice Amount:</strong> ${metadata.amount ? '$' + metadata.amount : 'N/A'}</p>
-        <p><strong>Message:</strong> ${message}</p>
-      `;
+        <p>A new invoice has been generated for your SalesForge organization.</p>
+        ${metadata.invoiceNumber ? `<p><strong>Invoice:</strong> ${metadata.invoiceNumber}</p>` : ""}
+        <p>${message}</p>`;
       actionText = "View Invoice";
       break;
+    }
 
+    // "Payment Received" / "Payment Failed" are high-risk spam subjects.
+    // Use neutral transactional phrasing instead.
     case "PAYMENT_RECEIVED":
-      title = "Payment Received";
+    case "BILLING_SUCCESS": {
+      title = "Your SalesForge subscription has been updated";
       bodyHtml = `
-        <p>A payment has been successfully received and processed.</p>
-        <p><strong>Amount Received:</strong> ${metadata.amount ? '$' + metadata.amount : 'N/A'}</p>
-        <p><strong>Description:</strong> ${metadata.description || message || 'N/A'}</p>
-      `;
-      actionText = "View Payments";
+        <p>Your subscription transaction was processed and your SalesForge plan is now active.</p>
+        <p>${message}</p>
+        <p>You can review your billing history in your account settings.</p>`;
+      actionText = "View Billing";
       break;
+    }
 
     case "PAYMENT_FAILED":
-      title = "Payment Failed";
+    case "BILLING_ISSUE": {
+      // Avoid "failed" in subject — use neutral action-needed language
+      title = "Action needed on your SalesForge subscription";
       bodyHtml = `
-        <p>An attempted payment transaction has failed.</p>
-        <p><strong>Amount:</strong> ${metadata.amount ? '$' + metadata.amount : 'N/A'}</p>
-        <p><strong>Reason:</strong> ${message}</p>
-        <p>Please check your billing and payment method settings.</p>
-      `;
-      actionText = "Update Billing Info";
+        <p>There was an issue processing your most recent subscription transaction. Please review your billing details to keep your account active.</p>
+        <p>${message}</p>`;
+      actionText = "Review Billing";
       break;
+    }
 
+    case "BILLING_UPDATE": {
+      title = "Your SalesForge plan has been updated";
+      bodyHtml = `
+        <p>Your SalesForge subscription plan has changed. The new plan is now active for your organization.</p>
+        <p>${message}</p>`;
+      actionText = "View Plan Details";
+      break;
+    }
+
+    // ── TEAM ─────────────────────────────────────────────────────────────────
     case "TEAM_MEMBER_INVITED":
     case "TEAM_INVITATION":
-    case "TEAM_INVITE":
-      title = "Team Invitation";
+    case "TEAM_INVITE": {
+      title = "Team invitation sent";
       bodyHtml = `
-        <p>You have been invited to join a team on SalesForge CRM.</p>
-        <p><strong>Invite Message:</strong> ${message}</p>
-        <p>Click the button below to accept your invitation and join the organization.</p>
-      `;
-      actionText = "Accept Invitation";
-      break;
-
-    case "TEAM_MEMBER_ADDED":
-    case "MEMBER_JOINED":
-      title = "Team Member Joined";
-      bodyHtml = `
-        <p>A new member has joined your team organization on SalesForge CRM.</p>
-        <p><strong>Member Name:</strong> ${metadata.memberName || 'A team member'}</p>
-        <p><strong>Details:</strong> ${message}</p>
-      `;
+        <p>An invitation has been sent to a new member to join your SalesForge organization.</p>
+        <p>${message}</p>`;
       actionText = "View Team";
       break;
+    }
+
+    case "TEAM_MEMBER_ADDED":
+    case "MEMBER_JOINED": {
+      const memberName = metadata.memberName || "A new member";
+      title = `${memberName} joined your organization`;
+      bodyHtml = `
+        <p><strong>${memberName}</strong> has accepted their invitation and joined your SalesForge organization.</p>
+        <p>${message}</p>`;
+      actionText = "View Team";
+      break;
+    }
+
+    case "TEAM_MEMBER_REMOVED": {
+      title = "Team membership update";
+      bodyHtml = `
+        <p>A change has been made to team membership in your SalesForge organization.</p>
+        <p>${message}</p>`;
+      actionText = "View Team";
+      break;
+    }
 
     case "ROLE_CHANGED":
-    case "TEAM_ROLE_UPDATED":
-      title = "Team Role Updated";
+    case "TEAM_ROLE_UPDATED": {
+      title = "Your organization role has been updated";
       bodyHtml = `
-        <p>Your access role in your organization has been updated.</p>
-        <p><strong>Details:</strong> ${message}</p>
-      `;
-      actionText = "View Team Settings";
+        <p>Your access role in your SalesForge organization has been updated by an administrator.</p>
+        <p>${message}</p>`;
+      actionText = "View Settings";
       break;
+    }
 
-    case "LOGIN_ALERT":
-      title = "Security Alert: New Login";
+    // ── SYSTEM ───────────────────────────────────────────────────────────────
+    case "LOGIN_ALERT": {
+      // "Security Alert" is a major phishing keyword — avoid it
+      title = "New login to your SalesForge account";
       bodyHtml = `
-        <p>A new login session was detected on your account.</p>
-        <p><strong>Details:</strong> ${message}</p>
-        <p>If this was not you, please secure your account immediately.</p>
-      `;
-      actionText = "Manage Security Settings";
+        <p>A new login was recorded for your SalesForge account.</p>
+        <p>${message}</p>
+        <p>If this was you, no action is needed. If you do not recognize this activity, please review your account sessions in your settings.</p>`;
+      actionText = "View Account Sessions";
       break;
+    }
 
-    case "PASSWORD_CHANGED":
-      title = "Password Changed";
+    case "PASSWORD_CHANGED": {
+      title = "Your SalesForge password was changed";
       bodyHtml = `
-        <p>Your account password was recently changed.</p>
-        <p><strong>Details:</strong> ${message}</p>
-        <p>If you did not make this change, please contact support or reset your password immediately.</p>
-      `;
-      actionText = "Account Security";
+        <p>The password for your SalesForge account was recently updated.</p>
+        <p>If you made this change, no further action is needed. If you did not make this change, please review your account settings and contact support.</p>`;
+      actionText = "Review Account";
       break;
+    }
 
-    case "MAINTENANCE_NOTICE":
-      title = "System Maintenance Notice";
+    case "MAINTENANCE_NOTICE": {
+      title = "Scheduled maintenance for SalesForge";
       bodyHtml = `
-        <p>Scheduled maintenance notification for SalesForge CRM.</p>
-        <p><strong>Notice:</strong> ${message}</p>
-      `;
-      actionText = "View System Status";
+        <p>The SalesForge team has scheduled maintenance that may affect service availability.</p>
+        <p>${message}</p>`;
+      actionText = "View Status";
       break;
+    }
 
     case "SYSTEM_ALERT":
-    default:
-      title = metadata.title || "System Alert";
+    default: {
+      title = metadata.title || "SalesForge account update";
       bodyHtml = `
-        <p>An important system event has occurred on your SalesForge account.</p>
-        <p><strong>Event Message:</strong> ${message}</p>
-      `;
+        <p>There is an update regarding your SalesForge account.</p>
+        <p>${message}</p>`;
       actionText = "Go to Dashboard";
       break;
+    }
   }
 
   const html = getBaseLayout(title, bodyHtml, actionText, actionUrl, frontendUrl);
-  const text = `${title}\n\n${message}\n\nView details: ${actionUrl}`;
 
-  return { subject: title, html, text };
+  // Plain-text must be substantive — a bare URL alone is a spam signal.
+  const text = [
+    "SalesForge Notification",
+    "─────────────────────────",
+    title,
+    "",
+    message,
+    "",
+    `Open in SalesForge: ${actionUrl}`,
+    "",
+    "─────────────────────────",
+    "You received this because you have email notifications enabled in SalesForge.",
+    `Manage preferences: ${frontendUrl}/notifications-prefs`,
+  ].join("\n");
+
+  // Subject prefix ensures consistent sender identity and avoids bare spam words
+  return { subject: `[SalesForge] ${title}`, html, text };
 };
 
-module.exports = {
-  compileTemplate,
-};
+module.exports = { compileTemplate };

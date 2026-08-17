@@ -1,83 +1,61 @@
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 
-let transporter;
+let resendClient = null;
 
-// Send real emails when credentials are configured, regardless of NODE_ENV
-const hasEmailCredentials = () =>
-  !!(process.env.EMAIL_USER && process.env.EMAIL_PASS);
-
-const shouldSendRealEmail = () =>
-  hasEmailCredentials() || process.env.EMAIL_FORCE_DELIVERY === "true";
-
-const getTransporter = () => {
-  if (transporter) {
-    return transporter;
+const getResend = () => {
+  if (!process.env.RESEND_API_KEY) return null;
+  if (!resendClient) {
+    resendClient = new Resend(process.env.RESEND_API_KEY);
   }
-
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    return null;
-  }
-
-  transporter = nodemailer.createTransport({
-    service: process.env.EMAIL_SERVICE || "gmail",
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
-
-  return transporter;
+  return resendClient;
 };
 
-const sendEmail = async ({ to, subject, html }) => {
-  if (!shouldSendRealEmail()) {
+const sendEmail = async ({ to, subject, html, text }) => {
+  const client = getResend();
+
+  if (!client) {
     if (process.env.NODE_ENV !== "test") {
-      console.info(`[email:dev-preview] ${subject} -> ${to}`);
+      console.info(`[email:skipped] RESEND_API_KEY not set. ${subject} -> ${to}`);
     }
-
-    return {
-      skipped: true,
-    };
-  }
-
-  const activeTransporter = getTransporter();
-
-  if (!activeTransporter) {
-    if (process.env.NODE_ENV !== "test") {
-      console.info(`[email:skipped] ${subject} -> ${to}`);
-    }
-
-    return {
-      skipped: true,
-    };
+    return { skipped: true };
   }
 
   try {
-    await activeTransporter.sendMail({
-      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+    const from = process.env.EMAIL_FROM || "SalesForge <onboarding@resend.dev>";
+    const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
+
+    const { error } = await client.emails.send({
+      from,
       to,
       subject,
       html,
+      text: text || subject,
+      reply_to: "support@salesforge.app",
+      headers: {
+        "List-Unsubscribe": `<${frontendUrl}/notifications-prefs>`,
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        "X-Entity-Ref-ID": `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      },
     });
 
-    return {
-      skipped: false,
-    };
-  } catch (error) {
-    transporter = null;
+    if (error) {
+      if (process.env.NODE_ENV !== "test") {
+        console.warn(`[email:error] ${subject} -> ${to}: ${error.message}`);
+      }
+      return { skipped: true, error: error.message };
+    }
+
+    return { skipped: false };
+  } catch (err) {
+    if (process.env.NODE_ENV !== "test") {
+      console.warn(`[email:fallback] ${subject} -> ${to}: ${err.message}`);
+    }
 
     if (process.env.NODE_ENV === "production" && process.env.EMAIL_FAIL_HARD !== "false") {
-      throw error;
+      throw err;
     }
 
-    if (process.env.NODE_ENV !== "test") {
-      console.warn(`[email:fallback] ${subject} -> ${to}: ${error.message}`);
-    }
-
-    return {
-      skipped: true,
-      error: error.message,
-    };
+    return { skipped: true, error: err.message };
   }
 };
 
@@ -85,6 +63,7 @@ const sendResetEmail = (email, resetUrl) => {
   return sendEmail({
     to: email,
     subject: "Reset your SalesForge password",
+    text: `You requested a password reset.\n\nUse the following link to choose a new password:\n${resetUrl}\n\nThis link expires in 1 hour.`,
     html: `
       <p>You requested a password reset.</p>
       <p>Use the following link to choose a new password:</p>
@@ -98,6 +77,7 @@ const sendVerificationEmail = (email, otp) => {
   return sendEmail({
     to: email,
     subject: "Your SalesForge verification code",
+    text: `Your verification code is: ${otp}\n\nThe code expires in 5 minutes.`,
     html: `
       <p>Your verification code is:</p>
       <p style="font-size: 24px; font-weight: 700; letter-spacing: 4px;">${otp}</p>
@@ -110,6 +90,7 @@ const sendInviteEmail = ({ to, inviterName, orgName, role, inviteUrl }) => {
   return sendEmail({
     to,
     subject: `You've been invited to join ${orgName} on SalesForge`,
+    text: `${inviterName} has invited you to join ${orgName} on SalesForge as a ${role}.\n\nAccept your invitation: ${inviteUrl}\n\nThis invite expires in 7 days.`,
     html: `
 <!DOCTYPE html>
 <html lang="en">
@@ -139,24 +120,16 @@ const sendInviteEmail = ({ to, inviterName, orgName, role, inviteUrl }) => {
                 <strong style="color:#00b5ad;">${orgName}</strong> on SalesForge as a
                 <strong style="color:#e2e8f0;">${role}</strong>.
               </p>
-
-              <!-- Role Badge -->
               <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:16px 20px;margin-bottom:28px;">
                 <p style="margin:0;color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Your Role</p>
                 <p style="margin:6px 0 0;color:#00b5ad;font-size:16px;font-weight:700;">${role}</p>
               </div>
-
-              <!-- CTA Button -->
               <div style="text-align:center;margin-bottom:28px;">
-                <a href="${inviteUrl}"
-                   style="display:inline-block;background:linear-gradient(135deg,#00b5ad,#0ea5e9);color:#ffffff;font-size:16px;font-weight:700;text-decoration:none;padding:14px 40px;border-radius:10px;letter-spacing:0.3px;">
+                <a href="${inviteUrl}" style="display:inline-block;background:linear-gradient(135deg,#00b5ad,#0ea5e9);color:#ffffff;font-size:16px;font-weight:700;text-decoration:none;padding:14px 40px;border-radius:10px;letter-spacing:0.3px;">
                   Accept Invitation
                 </a>
               </div>
-
-              <p style="margin:0 0 8px;color:#64748b;font-size:13px;text-align:center;">
-                Or copy this link into your browser:
-              </p>
+              <p style="margin:0 0 8px;color:#64748b;font-size:13px;text-align:center;">Or copy this link into your browser:</p>
               <p style="margin:0;text-align:center;">
                 <a href="${inviteUrl}" style="color:#0ea5e9;font-size:12px;word-break:break-all;">${inviteUrl}</a>
               </p>

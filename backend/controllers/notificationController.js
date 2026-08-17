@@ -142,4 +142,15 @@ const testEmail = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { listNotifications, readNotification, readAllNotifications, broadcast, testEmail };
+const deleteNotification = asyncHandler(async (req, res) => {
+  const result = await require("../services/notificationService").deleteNotification(req.params.id, req.user.id);
+  if (result.count === 0) return response.error(res, "Notification not found.", 404);
+  return response.success(res, { message: "Notification deleted." });
+});
+
+const deleteAllNotifications = asyncHandler(async (req, res) => {
+  const result = await require("../services/notificationService").deleteAllNotifications(req.user.id);
+  return response.success(res, { message: "All notifications deleted.", deletedCount: result.count });
+});
+
+module.exports = { listNotifications, readNotification, readAllNotifications, broadcast, testEmail, deleteNotification, deleteAllNotifications };
