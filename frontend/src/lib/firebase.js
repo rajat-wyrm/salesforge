@@ -16,7 +16,9 @@ export const app = initializeApp(firebaseConfig);
 // This keeps the firebase/messaging module in a separate async chunk.
 export const getFirebaseMessaging = async () => {
   try {
+
     const { isSupported, getMessaging } = await import("firebase/messaging");
+
     const supported = await isSupported();
     if (supported) {
       return getMessaging(app);

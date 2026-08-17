@@ -1,69 +1,92 @@
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 
-/**
- * Creates a Nodemailer transporter using SMTP environment variables.
- */
-const createTransporter = () => {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.gmail.com",
-    port: parseInt(process.env.SMTP_PORT || "587", 10),
-    secure: process.env.SMTP_SECURE === "true", // true for 465, false for other ports
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
+let resendClient = null;
+
+const getResend = () => {
+  if (!process.env.RESEND_API_KEY) return null;
+  if (!resendClient) {
+    resendClient = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resendClient;
 };
 
 /**
- * Sends an email using Nodemailer.
- * 
+ * Sends an email using Resend.
+ *
  * @param {object} opts
- * @param {string} opts.to - The recipient email address.
- * @param {string} opts.subject - The subject of the email.
- * @param {string} opts.html - The HTML body of the email.
- * @param {string} [opts.text] - Optional text body.
- * @returns {Promise<boolean>} True if successful, false otherwise.
+ * @param {string} opts.to         - Recipient email address
+ * @param {string} opts.subject    - Email subject
+ * @param {string} opts.html       - HTML body
+ * @param {string} [opts.text]     - Plain-text fallback
+ * @returns {Promise<boolean>} true if sent, false otherwise
  */
 const send = async ({ to, subject, html, text }) => {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.warn("[EmailService] EMAIL_USER or EMAIL_PASS not set. Skipping email to:", to);
+  const client = getResend();
+
+  if (!client) {
+    console.warn("[EmailService] RESEND_API_KEY not set. Skipping email to:", to);
     return false;
   }
 
   try {
-    const transporter = createTransporter();
-    
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM || `"SalesForge Notifications" <${process.env.EMAIL_USER}>`,
+    const from = process.env.EMAIL_FROM || "SalesForge Notifications <onboarding@resend.dev>";
+    const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
+
+    const { error } = await client.emails.send({
+      from,
+
       to,
       subject,
-      text: text || "",
       html,
+      text: text || subject,
+      // reply_to prevents "no-reply" pattern which raises spam score
+      reply_to: "support@salesforge.app",
+      headers: {
+        // List-Unsubscribe is required by Gmail/Yahoo for bulk senders
+        "List-Unsubscribe": `<${frontendUrl}/notifications-prefs>`,
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        // Unique ID per message prevents dedup false-positives
+        "X-Entity-Ref-ID": `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      },
     });
+
+    if (error) {
+      console.error("[EmailService] Resend API error:", error);
+      return false;
+    }
 
     console.log(`[EmailService] Email sent successfully to ${to}`);
     return true;
-  } catch (error) {
-    console.error("[EmailService] Failed to send email via SMTP:", error);
-    // Return false instead of throwing so we don't break the notification pipeline.
+  } catch (err) {
+    console.error("[EmailService] Failed to send email via Resend:", err);
     return false;
   }
 };
 
 /**
  * Sends a basic notification email (backward-compatible wrapper).
- * 
- * @param {string} to - The recipient email address.
- * @param {string} subject - The subject of the email.
- * @param {string} text - The plaintext body of the email.
- * @returns {Promise<boolean>} True if successful, false otherwise.
+ *
+ * @param {string} to      - Recipient email address
+ * @param {string} subject - Email subject
+ * @param {string} text    - Plaintext body
+ * @returns {Promise<boolean>} true if sent, false otherwise
  */
 const sendNotificationEmail = async (to, subject, text) => {
-  const html = `<div style="font-family: sans-serif; color: #333; line-height: 1.5;">
-                 <h2>SalesForge Notification</h2>
-                 <p>${text.replace(/\n/g, "<br>")}</p>
-               </div>`;
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${subject}</title>
+</head>
+<body style="font-family: sans-serif; color: #333; line-height: 1.5;">
+  <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+    <h2 style="color: #00b5ad;">SalesForge Notification</h2>
+    <p>${text.replace(/\n/g, "<br>")}</p>
+    <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+    <p style="font-size: 12px; color: #999;">You received this because you enabled email notifications in SalesForge.</p>
+  </div>
+</body>
+</html>`;
   return send({ to, subject, html, text });
 };
 

@@ -1,12 +1,16 @@
 import { useEffect, useState, useRef } from 'react';
 import { getFirebaseMessaging, firebaseConfig } from '../lib/firebase';
 import { toast } from 'sonner';
-import { api } from '../lib/api';
+import { pushService } from '../services';
 
+// Module-level guard
+let _subscribeInProgress = false;
+let _subscribed = false;
 export const usePushNotifications = (scrollThreshold = 0.7) => {
   const [token, setToken] = useState(null);
   const scrolledRef = useRef(false);
 
+  // Set up Firebase foreground message listener (safe to call in every instance)
   useEffect(() => {
     let unsubscribe = null;
 
@@ -18,27 +22,35 @@ export const usePushNotifications = (scrollThreshold = 0.7) => {
       const { onMessage } = await import('firebase/messaging');
       unsubscribe = onMessage(messaging, (payload) => {
         console.log("Foreground message received:", payload);
-        toast(payload.notification?.title || "New Notification", {
-          description: payload.notification?.body || "You have a new message",
-        });
+        // OS notification and toast are handled by NotificationBell SSE stream
+        // to avoid double-popups.
+
       });
     };
 
     setupForegroundMessaging();
 
     return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 
+
   const requestPermissionAndSubscribe = async () => {
+    // Deduplicate: if already subscribed or a subscribe is in progress, skip.
+    if (_subscribed || _subscribeInProgress) return;
+    _subscribeInProgress = true;
+
     try {
       const permission = await Notification.requestPermission();
+
       if (permission === 'granted') {
         const messaging = await getFirebaseMessaging();
-        if (!messaging) return;
+
+        if (!messaging) {
+          _subscribeInProgress = false;
+          return;
+        }
 
         // Dynamic import to avoid static + dynamic conflict
         const { getToken } = await import('firebase/messaging');
@@ -55,37 +67,44 @@ export const usePushNotifications = (scrollThreshold = 0.7) => {
 
         if (currentToken) {
           setToken(currentToken);
-          // Send token to backend
-          await api.post('/push/subscribe', { token: currentToken });
+          await pushService.subscribe(currentToken);
           console.log("Push token sent to backend successfully.");
+
+          // Toast fires exactly once — module-level flag prevents re-entry
+          toast.success("Push notifications enabled.");
+          _subscribed = true;
         }
       }
     } catch (error) {
       console.error("Error subscribing to push notifications:", error);
+    } finally {
+      _subscribeInProgress = false;
     }
   };
 
+
+
+  // Auto-subscribe on mount if permission is already granted.
   useEffect(() => {
     if ("Notification" in window && Notification.permission === "granted") {
       requestPermissionAndSubscribe();
     }
   }, []);
 
+  // Trigger subscribe when user scrolls past threshold.
   useEffect(() => {
     const handleScroll = () => {
-      if (scrolledRef.current) return; // Already triggered
+      if (scrolledRef.current) return;
 
       const scrollTop = window.scrollY || document.documentElement.scrollTop;
       const scrollHeight = document.documentElement.scrollHeight;
       const clientHeight = document.documentElement.clientHeight;
-
       const scrolledPercentage = scrollTop / (scrollHeight - clientHeight);
 
       if (scrolledPercentage >= scrollThreshold) {
         scrolledRef.current = true;
-        if (Notification.permission === 'default') {
-          requestPermissionAndSubscribe();
-        } else if (Notification.permission === 'granted') {
+
+        if (Notification.permission === 'default' || Notification.permission === 'granted') {
           requestPermissionAndSubscribe();
         }
       }

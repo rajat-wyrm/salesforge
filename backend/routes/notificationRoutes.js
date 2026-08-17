@@ -13,4 +13,7 @@ router.patch("/:id/read", ctrl.readNotification);
 router.post("/broadcast", permit("OWNER", "ADMIN"), ctrl.broadcast);
 router.post("/test-email", ctrl.testEmail);
 
+router.delete("/", ctrl.deleteAllNotifications);
+router.delete("/:id", ctrl.deleteNotification);
+
 module.exports = router;

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { notificationService } from "@/services";
 import { openEventStream } from "@/lib/api";
-import { Bell } from "lucide-react";
+import { Bell, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 const NotificationBell = () => {
@@ -24,6 +24,7 @@ const NotificationBell = () => {
     load();
     const stream = openEventStream("/sse/stream", {
       onEvent: (evt) => {
+
         if (evt === "notification.new" || evt === "notifications.read_all") load();
         if (["LEAD_CREATED", "LEAD_UPDATED", "DEAL_CREATED", "DEAL_UPDATED", "PAYMENT_SUCCEEDED", "PAYMENT_FAILED", "USER_INVITED", "USER_JOINED", "INTEGRATION_SYNCED"].includes(evt)) {
           load();
@@ -44,6 +45,22 @@ const NotificationBell = () => {
     catch {}
   };
 
+  const deleteAll = async () => {
+    try {
+      await notificationService.removeAll();
+      setItems([]);
+      setUnread(0);
+    } catch {}
+  };
+
+  const deleteOne = async (id, isRead) => {
+    try {
+      await notificationService.remove(id);
+      setItems((p) => p.filter((n) => n.id !== id));
+      if (!isRead) setUnread((u) => Math.max(0, u - 1));
+    } catch {}
+  };
+
   return (
     <div className="relative">
       <button
@@ -60,24 +77,39 @@ const NotificationBell = () => {
         )}
       </button>
       {open && (
-        <div className="absolute right-0 z-40 mt-2 w-80 max-w-[90vw] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-900">
-          <div className="flex items-center justify-between border-b border-gray-200 px-4 py-2 text-sm font-semibold dark:border-gray-800">
-            <span>Notifications</span>
-            <button onClick={markAll} className="text-xs font-normal text-teal-600 hover:underline">Mark all read</button>
+        <div className="absolute right-0 z-40 mt-2 w-80 max-w-[90vw] sm:w-96 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-900">
+          <div className="flex flex-col border-b border-gray-200 dark:border-gray-800">
+            <div className="flex items-center justify-between px-4 py-3 text-sm font-semibold">
+              <span>Notifications</span>
+              <div className="flex items-center gap-3">
+                <button onClick={markAll} className="text-xs font-normal text-teal-600 hover:underline">
+                  Mark all read
+                </button>
+                <button onClick={deleteAll} className="text-xs font-normal text-red-500 hover:underline">
+                  Clear all
+                </button>
+              </div>
+            </div>
           </div>
+
           <ul className="max-h-80 divide-y divide-gray-100 overflow-y-auto dark:divide-gray-800">
             {items.length === 0 ? (
               <li className="px-4 py-6 text-center text-sm text-gray-500">No notifications yet.</li>
             ) : items.map((n) => (
-              <li key={n.id} className={`flex items-start gap-2 px-4 py-3 text-sm ${n.is_read ? "" : "bg-teal-50/50 dark:bg-teal-900/10"}`}>
+              <li key={n.id} className={`group flex items-start gap-2 px-4 py-3 text-sm ${n.is_read ? "" : "bg-teal-50/50 dark:bg-teal-900/10"}`}>
                 <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full" style={{ background: n.is_read ? "transparent" : "#14b8a6" }} />
                 <div className="flex-1">
                   <p className="font-medium text-gray-900 dark:text-white">{n.message}</p>
                   <p className="text-xs text-gray-500">{n.type} · {new Date(n.createdAt).toLocaleString()}</p>
                 </div>
-                {!n.is_read && (
-                  <button onClick={() => markOne(n.id)} className="text-xs text-teal-600 hover:underline">Read</button>
-                )}
+                <div className="flex flex-col items-end gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                  {!n.is_read && (
+                    <button onClick={() => markOne(n.id)} className="text-xs text-teal-600 hover:underline">Read</button>
+                  )}
+                  <button onClick={() => deleteOne(n.id, n.is_read)} className="text-gray-400 hover:text-red-500 transition-colors" title="Delete notification">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
