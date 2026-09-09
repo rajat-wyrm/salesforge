@@ -102,7 +102,9 @@ export const usageService = {
 export const auditService = {
   list: (params) => unwrapList(api.get("/audit", { params })),
 };
-
+export const pushService = {
+  subscribe: (token) => unwrap(api.post("/push/subscribe", { token })),
+};
 export const notificationService = {
   list: (params) => unwrap(api.get("/notifications", { params })),
   markRead: (id) => unwrap(api.patch(`/notifications/${id}/read`)),
