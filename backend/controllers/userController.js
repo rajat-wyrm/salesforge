@@ -39,7 +39,7 @@ const updateCurrentUser = asyncHandler(async (req, res) => {
     data,
   });
 
-  
+
   // Cache Invalidation
   const keys = await redisClient.keys(
   `users:${req.user.organizationId}:*`
@@ -58,8 +58,11 @@ const listUsers = asyncHandler(async (req, res) => {
 
   const cacheKey = `users:${req.orgId}:${page}:${limit}:${search || ""}`;
 
-  const cachedData = await redisClient.get(cacheKey);
+  let cachedData = null;
 
+if (redisClient.isOpen) {
+  cachedData = await redisClient.get(cacheKey);
+}
   if (cachedData) {
 
     const data = JSON.parse(cachedData);
@@ -104,6 +107,7 @@ const listUsers = asyncHandler(async (req, res) => {
     prisma.user.count({ where }),
   ]);
 
+  if (redisClient.isOpen) {
   await redisClient.set(
     cacheKey,
     JSON.stringify({ users, total }),
@@ -111,6 +115,7 @@ const listUsers = asyncHandler(async (req, res) => {
       EX: 300,
     }
   );
+}
 
   return response.paginated(res, users, total, page, limit);
 });
