@@ -481,7 +481,3 @@ export const intelService = {
   saveQuery: (data) => unwrap(api.post("/intel/saved", data)),
 };
 
-export const pushService = {
-  subscribe: (token) => unwrap(api.post("/push/subscribe", { token })),
-  notify: (data) => unwrap(api.post("/push/notify", data)),
-};
